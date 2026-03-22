@@ -1,0 +1,5 @@
+.env
+credentials.txt
+*.zip
+*.tar.gz
+.DS_Store

@@ -1,0 +1,9 @@
+---
+title: My Privacy Stack
+theme: dark
+color: zinc
+headerStyle: clean
+layout:
+  My Stack:
+    style: row
+    columns: 4

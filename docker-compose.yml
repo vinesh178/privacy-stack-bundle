@@ -1,0 +1,331 @@
+##############################################################################
+# 🔒 The Complete Privacy Stack
+# One command. Eight self-hosted apps. Full data ownership.
+#
+# Usage:
+#   1. Copy .env.example to .env and fill in your values
+#   2. Run: docker compose up -d
+#   3. Access Nginx Proxy Manager at http://YOUR_IP:81
+#   4. Set up your domains/SSL in NPM
+#   5. Enjoy your privacy stack!
+#
+# Apps included:
+#   - Nginx Proxy Manager (reverse proxy + SSL)
+#   - Immich (Google Photos replacement)
+#   - Paperless-ngx (document management)
+#   - Jellyfin (Netflix replacement)
+#   - AdGuard Home (DNS + ad blocking)
+#   - Vaultwarden (Bitwarden-compatible password manager)
+#   - Uptime Kuma (monitoring)
+#   - Homepage (dashboard)
+#   - Tailscale (secure remote access)
+#
+# Requirements:
+#   - Ubuntu 22.04/24.04 LTS
+#   - Docker + Docker Compose v2
+#   - Minimum 4GB RAM, 8GB recommended
+#   - 40GB+ disk (more for photos/media)
+##############################################################################
+
+services:
+
+  # ============================================================
+  # NGINX PROXY MANAGER — Reverse proxy + free SSL certificates
+  # Access: http://YOUR_IP:81 (admin panel)
+  # Default login: admin@example.com / changeme
+  # ============================================================
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: npm
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "81:81"
+    volumes:
+      - npm_data:/data
+      - npm_letsencrypt:/etc/letsencrypt
+    networks:
+      - proxy
+
+  # ============================================================
+  # IMMICH — Google Photos replacement
+  # Access via NPM: photos.yourdomain.com → localhost:2283
+  # ============================================================
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:release
+    container_name: immich_server
+    restart: unless-stopped
+    profiles: ["photos"]
+    ports:
+      - "2283:2283"
+    volumes:
+      - ${UPLOAD_DIR:-./data/immich/upload}:/usr/src/app/upload
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - DB_HOSTNAME=immich-postgres
+      - DB_USERNAME=${IMMICH_DB_USER:-postgres}
+      - DB_PASSWORD=${IMMICH_DB_PASSWORD}
+      - DB_DATABASE_NAME=${IMMICH_DB_NAME:-immich}
+      - REDIS_HOSTNAME=immich-redis
+    depends_on:
+      - immich-redis
+      - immich-postgres
+    networks:
+      - proxy
+      - immich
+
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:release
+    container_name: immich_ml
+    restart: unless-stopped
+    profiles: ["photos"]
+    volumes:
+      - immich_ml_cache:/cache
+    networks:
+      - immich
+
+  immich-redis:
+    image: redis:7-alpine
+    container_name: immich_redis
+    restart: unless-stopped
+    profiles: ["photos"]
+    networks:
+      - immich
+
+  immich-postgres:
+    image: tensorchord/pgvecto-rs:pg16-v0.2.0
+    container_name: immich_postgres
+    restart: unless-stopped
+    profiles: ["photos"]
+    environment:
+      - POSTGRES_USER=${IMMICH_DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${IMMICH_DB_PASSWORD}
+      - POSTGRES_DB=${IMMICH_DB_NAME:-immich}
+    volumes:
+      - immich_db:/var/lib/postgresql/data
+    networks:
+      - immich
+
+  # ============================================================
+  # PAPERLESS-NGX — Document management + OCR
+  # Access via NPM: docs.yourdomain.com → localhost:8000
+  # ============================================================
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    container_name: paperless
+    restart: unless-stopped
+    profiles: ["docs"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - paperless_data:/usr/src/paperless/data
+      - paperless_media:/usr/src/paperless/media
+      - ${PAPERLESS_CONSUME_DIR:-./data/paperless/consume}:/usr/src/paperless/consume
+      - ${PAPERLESS_EXPORT_DIR:-./data/paperless/export}:/usr/src/paperless/export
+    environment:
+      - PAPERLESS_REDIS=redis://paperless-redis:6379
+      - PAPERLESS_DBHOST=paperless-db
+      - PAPERLESS_DBPASS=${PAPERLESS_DB_PASSWORD}
+      - PAPERLESS_TIKA_ENABLED=1
+      - PAPERLESS_TIKA_GOTENBERG_ENDPOINT=http://paperless-gotenberg:3000
+      - PAPERLESS_TIKA_ENDPOINT=http://paperless-tika:9998
+      - PAPERLESS_ADMIN_USER=${PAPERLESS_ADMIN_USER:-admin}
+      - PAPERLESS_ADMIN_PASSWORD=${PAPERLESS_ADMIN_PASSWORD}
+      - PAPERLESS_SECRET_KEY=${PAPERLESS_SECRET_KEY}
+      - PAPERLESS_URL=${PAPERLESS_URL:-http://localhost:8000}
+    depends_on:
+      - paperless-db
+      - paperless-redis
+      - paperless-gotenberg
+      - paperless-tika
+    networks:
+      - proxy
+      - paperless
+
+  paperless-db:
+    image: postgres:16-alpine
+    container_name: paperless_db
+    restart: unless-stopped
+    profiles: ["docs"]
+    environment:
+      - POSTGRES_PASSWORD=${PAPERLESS_DB_PASSWORD}
+      - POSTGRES_DB=paperless
+    volumes:
+      - paperless_pgdata:/var/lib/postgresql/data
+    networks:
+      - paperless
+
+  paperless-redis:
+    image: redis:7-alpine
+    container_name: paperless_redis
+    restart: unless-stopped
+    profiles: ["docs"]
+    networks:
+      - paperless
+
+  paperless-gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: paperless_gotenberg
+    restart: unless-stopped
+    profiles: ["docs"]
+    command:
+      - gotenberg
+      - --chromium-disable-javascript=true
+      - --chromium-allow-list=file:///tmp/.*
+    networks:
+      - paperless
+
+  paperless-tika:
+    image: apache/tika:latest
+    container_name: paperless_tika
+    restart: unless-stopped
+    profiles: ["docs"]
+    networks:
+      - paperless
+
+  # ============================================================
+  # JELLYFIN — Media server (Netflix replacement)
+  # Access via NPM: media.yourdomain.com → localhost:8096
+  # ============================================================
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    profiles: ["media"]
+    ports:
+      - "8096:8096"
+    volumes:
+      - jellyfin_config:/config
+      - jellyfin_cache:/cache
+      - ${MEDIA_DIR:-./data/media}:/media:ro
+    environment:
+      - JELLYFIN_PublishedServerUrl=${JELLYFIN_URL:-http://localhost:8096}
+    networks:
+      - proxy
+
+  # ============================================================
+  # ADGUARD HOME — DNS server + ad/tracker blocking
+  # Access via NPM: dns.yourdomain.com → localhost:3000
+  # DNS: point devices to YOUR_SERVER_IP as DNS server
+  # ============================================================
+  adguard:
+    image: adguard/adguardhome:latest
+    container_name: adguard
+    restart: unless-stopped
+    profiles: ["dns"]
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "3000:3000"
+    volumes:
+      - adguard_work:/opt/adguardhome/work
+      - adguard_conf:/opt/adguardhome/conf
+    networks:
+      - proxy
+
+  # ============================================================
+  # VAULTWARDEN — Bitwarden-compatible password manager
+  # Access via NPM: vault.yourdomain.com → localhost:8080
+  # ============================================================
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    profiles: ["passwords"]
+    ports:
+      - "8080:80"
+    volumes:
+      - vaultwarden_data:/data
+    environment:
+      - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
+      - DOMAIN=${VAULTWARDEN_URL:-https://vault.yourdomain.com}
+      - SIGNUPS_ALLOWED=${VAULTWARDEN_SIGNUPS:-true}
+    networks:
+      - proxy
+
+  # ============================================================
+  # UPTIME KUMA — Service monitoring
+  # Access via NPM: status.yourdomain.com → localhost:3001
+  # ============================================================
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime_kuma
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    ports:
+      - "3001:3001"
+    volumes:
+      - uptime_kuma_data:/app/data
+    networks:
+      - proxy
+
+  # ============================================================
+  # TAILSCALE — Secure remote access (no port forwarding needed)
+  # After starting, run: docker exec tailscale tailscale up
+  # Then access all services from anywhere via Tailscale IP
+  # ============================================================
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    restart: unless-stopped
+    profiles: ["vpn"]
+    hostname: privacy-stack
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    volumes:
+      - tailscale_data:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_AUTHKEY:-}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+    network_mode: host
+
+  # ============================================================
+  # HOMEPAGE — Dashboard linking all your services
+  # Access via NPM: home.yourdomain.com → localhost:3002
+  # ============================================================
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    profiles: ["dashboard"]
+    ports:
+      - "3002:3000"
+    volumes:
+      - ./configs/homepage:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - proxy
+
+# ============================================================
+# VOLUMES
+# ============================================================
+volumes:
+  npm_data:
+  npm_letsencrypt:
+  immich_db:
+  immich_ml_cache:
+  paperless_data:
+  paperless_media:
+  paperless_pgdata:
+  jellyfin_config:
+  jellyfin_cache:
+  adguard_work:
+  adguard_conf:
+  vaultwarden_data:
+  uptime_kuma_data:
+  tailscale_data:
+
+# ============================================================
+# NETWORKS
+# ============================================================
+networks:
+  proxy:
+    name: privacy-stack
+  immich:
+    internal: true
+  paperless:
+    internal: true
