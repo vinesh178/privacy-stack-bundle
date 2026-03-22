@@ -66,23 +66,15 @@ Available: Immich, Paperless-ngx, Jellyfin, AdGuard Home, Vaultwarden, Uptime Ku
 
 ## After Installation
 
-### 1. Nginx Proxy Manager (First!)
-- Go to `http://YOUR_IP:81`
-- Login: `admin@example.com` / `changeme`
-- **Change the default password immediately**
-- Add proxy hosts for each service:
+### 1. Nginx Proxy Manager (Auto-configured!)
+Setup automatically:
+- Changes the default password (saved to `credentials.txt`)
+- Creates proxy hosts for all enabled services (if you provided a domain)
+- Requests Let's Encrypt SSL certificates (if you provided an email)
 
-| Subdomain | Forward To | Port |
-|-----------|-----------|------|
-| `photos.yourdomain.com` | `immich_server` | 2283 |
-| `docs.yourdomain.com` | `paperless` | 8000 |
-| `media.yourdomain.com` | `jellyfin` | 8096 |
-| `dns.yourdomain.com` | `adguard` | 3000 |
-| `vault.yourdomain.com` | `vaultwarden` | 80 |
-| `status.yourdomain.com` | `uptime_kuma` | 3001 |
-| `home.yourdomain.com` | `homepage` | 3000 |
+**If you have a domain:** Point `*.yourdomain.com` (wildcard DNS) to your server IP, and everything works automatically.
 
-- Enable SSL for each with Let's Encrypt (free, automatic)
+**If you don't have a domain:** Access services directly by IP:port (e.g., `http://YOUR_IP:2283` for photos). No proxy setup needed.
 
 ### 2. Immich (Photos)
 - Open `http://YOUR_IP:2283`
