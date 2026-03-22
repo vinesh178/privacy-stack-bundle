@@ -33,25 +33,34 @@ Works on: VPS (Hetzner, DigitalOcean, Linode), home server, old laptop, mini PC.
 
 ## Quick Start
 
+### One-Line Install
+
 ```bash
-# 1. Clone or extract the bundle
-cd privacy-stack-bundle
-
-# 2. Run the setup script (installs Docker, creates directories, configures firewall)
-sudo bash scripts/setup.sh
-
-# 3. Configure your passwords
-cp .env.example .env
-nano .env  # Change ALL passwords!
-
-# 4. Start everything
-docker compose up -d
-
-# 5. Wait 2-3 minutes, then open:
-#    http://YOUR_IP:81 (Nginx Proxy Manager)
+curl -sL https://raw.githubusercontent.com/vinesh178/privacy-stack-bundle/main/install.sh | sudo bash
 ```
 
-That's it. All 8 apps running.
+That's it. The setup wizard walks you through everything — domain, which services you want, and all passwords are auto-generated. No manual config editing.
+
+### Manual Install
+
+```bash
+git clone https://github.com/vinesh178/privacy-stack-bundle.git
+cd privacy-stack-bundle
+sudo bash scripts/setup.sh
+```
+
+### Non-Interactive (automation / scripts)
+
+```bash
+# Install with all defaults, no prompts
+curl -sL https://raw.githubusercontent.com/vinesh178/privacy-stack-bundle/main/install.sh | NON_INTERACTIVE=1 sudo bash
+```
+
+### Choose Your Services
+
+The setup wizard lets you pick which apps to install. Don't need a media server? Skip it. Only want photos and passwords? Just select those. Only selected services will run.
+
+Available: Immich, Paperless-ngx, Jellyfin, AdGuard Home, Vaultwarden, Uptime Kuma, Homepage, Tailscale. Nginx Proxy Manager always runs (handles routing + SSL).
 
 ---
 
@@ -83,7 +92,7 @@ That's it. All 8 apps running.
 
 ### 3. Paperless-ngx (Documents)
 - Open `http://YOUR_IP:8000`
-- Login with credentials from `.env`
+- Login with credentials from `credentials.txt` (generated during setup)
 - Drag & drop PDFs into the consume folder or web UI
 - OCR runs automatically
 
@@ -128,12 +137,19 @@ docker compose up -d
 
 ### Backups
 ```bash
-# Stop services, backup volumes, restart
-docker compose stop
-sudo tar -czf privacy-stack-backup-$(date +%Y%m%d).tar.gz \
-  /srv/privacy-stack \
-  /var/lib/docker/volumes
-docker compose start
+# Full backup (brief downtime — most reliable)
+sudo bash scripts/backup.sh
+
+# Hot backup (no downtime — dumps databases first)
+sudo bash scripts/backup.sh --hot
+
+# Custom output path
+sudo bash scripts/backup.sh --hot /path/to/backup.tar.gz
+```
+
+### Restore (works on a fresh server too)
+```bash
+sudo bash scripts/restore.sh /path/to/backup.tar.gz
 ```
 
 ### Check status
@@ -181,7 +197,7 @@ Tested on an Intel N95 mini PC (16GB RAM):
 | Paperless not OCR-ing | Check Tika and Gotenberg are running: `docker compose logs paperless-tika` |
 | AdGuard DNS not working | Make sure port 53 isn't used by systemd-resolved: `sudo systemctl disable systemd-resolved` |
 | Out of disk space | Check with `df -h`. Immich photos are the biggest consumer. |
-| Forgot password | Most apps: check `.env` or reset via Docker exec |
+| Forgot password | Check `credentials.txt` or `.env`, or reset via Docker exec |
 
 ### systemd-resolved conflict (common on Ubuntu)
 AdGuard needs port 53, but Ubuntu's systemd-resolved uses it. Fix:
