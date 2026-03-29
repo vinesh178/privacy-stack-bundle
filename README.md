@@ -41,13 +41,32 @@ curl -sL https://raw.githubusercontent.com/vinesh178/privacy-stack-bundle/main/i
 
 That's it. The setup wizard walks you through everything — domain, which services you want, and all passwords are auto-generated. No manual config editing.
 
-### Manual Install
+### Manual Install (Git)
 
 ```bash
 git clone https://github.com/vinesh178/privacy-stack-bundle.git
 cd privacy-stack-bundle
 sudo bash scripts/setup.sh
 ```
+
+### Manual Install (Zip)
+
+If you downloaded a zip file (e.g., `privacy-stack-bundle.zip`):
+
+```bash
+# If unzip is available
+unzip privacy-stack-bundle.zip
+cd privacy-stack-bundle
+sudo bash scripts/setup.sh
+
+# If unzip is not installed (common on fresh VMs)
+sudo apt-get install -y unzip
+unzip privacy-stack-bundle.zip
+cd privacy-stack-bundle
+sudo bash scripts/setup.sh
+```
+
+> **Note:** The zip install does not include git history, so there is no built-in update path. To update later, re-download the zip and re-run setup, or switch to the git install method.
 
 ### Non-Interactive (automation / scripts)
 
