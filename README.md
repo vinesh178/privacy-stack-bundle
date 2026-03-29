@@ -23,7 +23,7 @@ Built and tested by someone who runs this exact stack daily with 20+ containers.
 
 - **OS:** Ubuntu 22.04 or 24.04 LTS
 - **RAM:** 4GB minimum, 8GB recommended
-- **Disk:** 40GB+ (more for photos and media)
+- **Disk:** 50GB minimum (Ubuntu + Docker overhead ~5GB, images ~10GB, plus room for data)
 - **Ports:** 80, 443, 53 available
 - **Domain:** Optional but recommended (for SSL)
 
