@@ -68,6 +68,61 @@ sudo bash scripts/setup.sh
 
 > **Note:** The zip install does not include git history, so there is no built-in update path. To update later, re-download the zip and re-run setup, or switch to the git install method.
 
+### Deploy to GCP (Terraform)
+
+You can now provision an Ubuntu VM on Google Compute Engine and install the full bundle automatically from one command.
+
+Prerequisites:
+- Terraform installed locally
+- Google Cloud project created
+- Authenticated Application Default Credentials, for example:
+
+```bash
+gcloud auth application-default login
+```
+
+Wrapper script:
+
+```bash
+bash scripts/deploy-gcp.sh \
+  --project-id your-gcp-project \
+  --region us-central1 \
+  --zone us-central1-a
+```
+
+With domain + SSL automation:
+
+```bash
+bash scripts/deploy-gcp.sh \
+  --project-id your-gcp-project \
+  --region us-central1 \
+  --zone us-central1-a \
+  --domain example.com \
+  --acme-email you@example.com
+```
+
+What it does:
+- Creates a dedicated VPC, subnet, firewall rules, static public IP, and Ubuntu 24.04 VM
+- Uses the VM startup script to run the existing `install.sh` in non-interactive mode
+- Auto-populates `.env` on the VM from Terraform variables, including profiles, domain, ACME email, and Tailscale auth key
+
+Files:
+- `terraform/gcp/` — Terraform config
+- `terraform/gcp/terraform.tfvars.example` — example variables file
+- `scripts/deploy-gcp.sh` — one-command wrapper for `terraform init` + `terraform apply`
+
+If you prefer raw Terraform instead of the wrapper:
+
+```bash
+terraform -chdir=terraform/gcp init
+terraform -chdir=terraform/gcp apply -auto-approve \
+  -var="project_id=your-gcp-project" \
+  -var="region=us-central1" \
+  -var="zone=us-central1-a"
+```
+
+After apply finishes, Terraform prints the VM IP, access URLs, and helpful `gcloud compute ssh ...` commands to inspect the startup log.
+
 ### Non-Interactive (automation / scripts)
 
 ```bash

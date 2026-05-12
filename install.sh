@@ -17,7 +17,7 @@ NC='\033[0m'
 
 INSTALL_DIR="${INSTALL_DIR:-/opt/privacy-stack}"
 BRANCH="${BRANCH:-main}"
-REPO_URL="https://github.com/vinesh178/privacy-stack-bundle.git"
+REPO_URL="${REPO_URL:-https://github.com/vinesh178/privacy-stack-bundle.git}"
 
 # Must be root
 if [ "$EUID" -ne 0 ]; then

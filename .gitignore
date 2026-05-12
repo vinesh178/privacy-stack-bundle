@@ -3,3 +3,7 @@ credentials.txt
 *.zip
 *.tar.gz
 .DS_Store
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
