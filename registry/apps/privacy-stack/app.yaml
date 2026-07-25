@@ -1,0 +1,25 @@
+apiVersion: install.run/v1
+kind: Application
+metadata:
+  id: privacy-stack
+  name: Complete Privacy Stack
+  description: Eight curated self-hosted applications with automatic setup, credentials, backups, and health checks.
+release:
+  version: 0.1.0
+deployment:
+  compose: docker-compose.yml
+  primaryService: npm
+  setupScript: scripts/setup.sh
+  ingress:
+    service: npm
+    port: 443
+configuration:
+  - key: domain
+    type: hostname
+    required: false
+    env: DOMAIN
+  - key: profiles
+    type: string
+    required: false
+    default: photos,docs,media,dns,passwords,monitoring,dashboard,vpn
+    env: COMPOSE_PROFILES

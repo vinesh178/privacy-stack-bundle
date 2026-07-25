@@ -4,7 +4,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Project Overview
 
-Docker Compose-based self-hosting bundle that deploys privacy-focused services on a VPS. No application code — this is infrastructure configuration (bash scripts + Docker Compose + YAML configs). Target OS: Ubuntu 22.04/24.04 LTS.
+Docker Compose-based self-hosting bundle that deploys privacy-focused services on a VPS. The host configuration remains Bash + Docker Compose + YAML. A small Go CLI (`runctl`) provides the MVP catalog, plan, install, and status experience. Target OS: Ubuntu 22.04/24.04 LTS.
 
 ## Commands
 

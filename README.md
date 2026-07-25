@@ -17,6 +17,51 @@ Replace Google Photos, Dropbox, Netflix, your password manager, and your DNS —
 
 Built and tested by someone who runs this exact stack daily with 20+ containers.
 
+## Product MVP: preview before installing
+
+`runctl` is the new product entry point. It uses a validated application
+manifest, shows the host changes before they happen, delegates installation to
+the existing setup path, and records a local installation receipt.
+
+Build it with Go 1.24+:
+
+```bash
+make build
+```
+
+Preview an installation:
+
+```bash
+./bin/runctl catalog list
+./bin/runctl catalog validate
+./bin/runctl plan privacy-stack \
+  --domain home.example.com \
+  --profiles photos,docs,passwords
+```
+
+Install unattended so the deployed configuration exactly matches the plan:
+
+```bash
+sudo ./bin/runctl install privacy-stack \
+  --non-interactive \
+  --domain home.example.com \
+  --profiles photos,docs,passwords
+```
+
+The MVP deliberately accepts only fresh installs. If `.env` already exists,
+`runctl install` stops instead of silently changing or ignoring configuration.
+Use the existing `scripts/setup.sh` workflow to maintain an existing host.
+
+After setup completes, inspect the durable installation receipt:
+
+```bash
+sudo ./bin/runctl status
+```
+
+The MVP intentionally supports one curated product. The registry, plan, and
+receipt boundaries let the team validate the experience before investing in a
+larger marketplace or control plane.
+
 ---
 
 ## Requirements

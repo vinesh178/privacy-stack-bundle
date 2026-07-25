@@ -7,3 +7,5 @@ credentials.txt
 *.tfstate
 *.tfstate.*
 *.tfplan
+bin/
+dist/
