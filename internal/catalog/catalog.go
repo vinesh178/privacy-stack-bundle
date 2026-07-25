@@ -22,6 +22,7 @@ type Application struct {
 	Release       Release              `yaml:"release" json:"release"`
 	Deployment    Deployment           `yaml:"deployment" json:"deployment"`
 	Configuration []ConfigurationField `yaml:"configuration" json:"configuration"`
+	Presets       map[string]Preset    `yaml:"presets" json:"presets,omitempty"`
 }
 
 type Metadata struct {
@@ -52,6 +53,12 @@ type ConfigurationField struct {
 	Required bool   `yaml:"required" json:"required"`
 	Default  string `yaml:"default" json:"default,omitempty"`
 	Env      string `yaml:"env" json:"env,omitempty"`
+}
+
+type Preset struct {
+	Description string            `yaml:"description" json:"description"`
+	MinimumRAM  int               `yaml:"minimumRAMMB" json:"minimumRAMMB,omitempty"`
+	Values      map[string]string `yaml:"values" json:"values"`
 }
 
 func LoadManifest(path string) (Application, error) {

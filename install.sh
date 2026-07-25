@@ -1,15 +1,16 @@
 #!/bin/bash
 # ============================================================
 # Privacy Stack — One-Line Installer
-# Usage: curl -sL <url>/install.sh | sudo bash
+# Usage: curl -fsSL <url>/install.sh | sudo env PRESET=aws-credit bash
 #
 # Environment variables (optional):
 #   INSTALL_DIR  — where to install (default: /opt/privacy-stack)
 #   BRANCH       — git branch/tag to checkout (default: main)
 #   NON_INTERACTIVE=1 — skip wizard, use defaults
+#   PRESET       — aws-credit or full (default: interactive setup)
 # ============================================================
 
-set -e
+set -euo pipefail
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -18,6 +19,8 @@ NC='\033[0m'
 INSTALL_DIR="${INSTALL_DIR:-/opt/privacy-stack}"
 BRANCH="${BRANCH:-main}"
 REPO_URL="${REPO_URL:-https://github.com/vinesh178/privacy-stack-bundle.git}"
+PRESET="${PRESET:-}"
+NON_INTERACTIVE="${NON_INTERACTIVE:-0}"
 
 # Must be root
 if [ "$EUID" -ne 0 ]; then
@@ -29,6 +32,11 @@ echo ""
 echo "Privacy Stack — One-Line Installer"
 echo "===================================="
 echo ""
+
+if [ -n "$PRESET" ]; then
+  echo "Preset: $PRESET"
+  echo ""
+fi
 
 # Check OS
 if [ -f /etc/os-release ]; then
@@ -62,9 +70,12 @@ fi
 echo -e "${GREEN}Download complete.${NC}"
 echo ""
 
-# Hand off to setup
-if [ "${NON_INTERACTIVE}" = "1" ]; then
-  exec bash scripts/setup.sh --non-interactive
+# Hand off to the product bootstrap. It builds runctl on the host so users do
+# not need to transfer binaries or install development tools themselves.
+if [ -n "$PRESET" ]; then
+  exec bash scripts/bootstrap-runctl.sh --preset "$PRESET"
+elif [ "$NON_INTERACTIVE" = "1" ]; then
+  exec bash scripts/bootstrap-runctl.sh
 else
   exec bash scripts/setup.sh
 fi

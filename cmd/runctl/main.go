@@ -23,8 +23,8 @@ const usage = `runctl — install the curated privacy stack
 Usage:
   runctl catalog list
   runctl catalog validate
-  runctl plan privacy-stack [--domain HOST] [--profiles LIST] [--json]
-  sudo runctl install privacy-stack --non-interactive [--domain HOST] [--profiles LIST]
+  runctl plan privacy-stack [--preset NAME] [--domain HOST] [--profiles LIST] [--json]
+  sudo runctl install privacy-stack --non-interactive [--preset NAME] [--domain HOST] [--profiles LIST]
   sudo runctl status
 
 Run a plan before install to preview every operation.`
@@ -175,6 +175,7 @@ func parsePlan(args []string, root string) (catalog.Application, planner.Plan, b
 	domain := flags.String("domain", "", "base domain")
 	profiles := flags.String("profiles", "", "comma-separated Compose profiles")
 	instance := flags.String("instance", "default", "instance name")
+	preset := flags.String("preset", "", "curated configuration preset")
 	jsonOutput := flags.Bool("json", false, "print JSON")
 	nonInteractive := flags.Bool("non-interactive", false, "run setup without prompts")
 	if err := flags.Parse(args[1:]); err != nil {
@@ -193,12 +194,15 @@ func parsePlan(args []string, root string) (catalog.Application, planner.Plan, b
 	if *profiles != "" {
 		values["profiles"] = *profiles
 	}
-	plan, err := planner.BuildInstallPlan(app, planner.InstallRequest{Instance: *instance, Values: values})
+	plan, err := planner.BuildInstallPlan(app, planner.InstallRequest{Instance: *instance, Preset: *preset, Values: values})
 	return app, plan, *jsonOutput, err
 }
 
 func printPlan(output io.Writer, app catalog.Application, plan planner.Plan) {
 	fmt.Fprintf(output, "%s %s\nInstance: %s\n\n", app.Metadata.Name, plan.Version, plan.InstanceID)
+	if plan.MinimumRAMMB > 0 {
+		fmt.Fprintf(output, "Required memory: at least %d MB\n\n", plan.MinimumRAMMB)
+	}
 	for index, operation := range plan.Operations {
 		fmt.Fprintf(output, "%d. %-22s %s\n", index+1, operation.Type, operation.Target)
 	}

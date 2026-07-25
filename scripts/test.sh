@@ -174,3 +174,7 @@ else
   echo "  docker compose logs <service_name>"
 fi
 echo ""
+
+if [ "$FAIL" -gt 0 ]; then
+  exit 1
+fi

@@ -35,6 +35,7 @@ Preview an installation:
 ./bin/runctl catalog list
 ./bin/runctl catalog validate
 ./bin/runctl plan privacy-stack \
+  --preset aws-credit \
   --domain home.example.com \
   --profiles photos,docs,passwords
 ```
@@ -77,6 +78,18 @@ Works on: VPS (Hetzner, DigitalOcean, Linode), home server, old laptop, mini PC.
 ---
 
 ## Quick Start
+
+### AWS credit: easiest test
+
+Create an Ubuntu 24.04 EC2 instance with 8 GB RAM and paste:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vinesh178/privacy-stack-bundle/main/install.sh | sudo env PRESET=aws-credit bash
+```
+
+No repository cloning, Go installation, local build, or file copying is
+required. See [the EC2 quick start](docs/EC2-QUICKSTART.md) for the complete
+three-step walkthrough.
 
 ### One-Line Install
 

@@ -295,8 +295,9 @@ else
   echo ""
   echo -e "${YELLOW}============================================================${NC}"
   echo -e "${YELLOW}$FAIL service(s) not ready yet. They may need more time.${NC}"
-  echo -e "${YELLOW}Wait 2 minutes and run: bash scripts/test.sh${NC}"
+  echo -e "${YELLOW}Waiting 90 seconds before the final health check.${NC}"
   echo -e "${YELLOW}============================================================${NC}"
+  sleep 90
 fi
 
 # ---- 9. Auto-configure Nginx Proxy Manager ----
@@ -342,3 +343,9 @@ echo "Backup your stack:  sudo bash scripts/backup.sh"
 echo "Restore from backup: sudo bash scripts/restore.sh /path/to/backup.tar.gz"
 echo "Health check:        bash scripts/test.sh"
 echo "============================================================"
+
+if [ "$FAIL" -gt 0 ]; then
+  echo ""
+  echo "Running final health check..."
+  bash scripts/test.sh
+fi

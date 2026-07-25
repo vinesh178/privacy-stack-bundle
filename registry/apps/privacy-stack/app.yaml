@@ -23,3 +23,9 @@ configuration:
     required: false
     default: photos,docs,media,dns,passwords,monitoring,dashboard,vpn
     env: COMPOSE_PROFILES
+presets:
+  aws-credit:
+    description: Full product validation on an 8 GB AWS credit-eligible instance.
+    minimumRAMMB: 7000
+    values:
+      profiles: photos,docs,media,passwords,monitoring,dashboard

@@ -76,6 +76,9 @@ func (service Service) Install(ctx context.Context, app catalog.Application, pla
 	if service.Runner == nil {
 		return Receipt{}, errors.New("installer runner is required")
 	}
+	if err := validateMemory(plan.MinimumRAMMB); err != nil {
+		return Receipt{}, err
+	}
 	if _, err := os.Stat(filepath.Join(service.RepositoryRoot, ".env")); err == nil {
 		return Receipt{}, errors.New("existing .env detected; the MVP only supports a fresh install to guarantee the plan matches the deployment")
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -108,6 +111,24 @@ func (service Service) Install(ctx context.Context, app catalog.Application, pla
 		return Receipt{}, err
 	}
 	return receipt, nil
+}
+
+func validateMemory(minimumMB int) error {
+	if minimumMB == 0 {
+		return nil
+	}
+	data, err := os.ReadFile("/proc/meminfo")
+	if err != nil {
+		return fmt.Errorf("inspect host memory: %w", err)
+	}
+	var totalKB int
+	if _, err := fmt.Sscanf(string(data), "MemTotal: %d kB", &totalKB); err != nil {
+		return fmt.Errorf("inspect host memory: %w", err)
+	}
+	if totalKB/1024 < minimumMB {
+		return fmt.Errorf("this preset needs at least 8 GB RAM; choose m7i-flex.large or t3.large")
+	}
+	return nil
 }
 
 func (service Service) resolveSetupScript(relativePath string) (string, error) {

@@ -13,6 +13,7 @@ var instanceNamePattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 
 type InstallRequest struct {
 	Instance string
+	Preset   string
 	Values   map[string]string
 }
 
@@ -20,6 +21,7 @@ type Plan struct {
 	Application      string            `json:"application"`
 	Version          string            `json:"version"`
 	InstanceID       string            `json:"instanceId"`
+	MinimumRAMMB     int               `json:"minimumRAMMB,omitempty"`
 	Configuration    map[string]string `json:"configuration,omitempty"`
 	SecretReferences map[string]string `json:"secretReferences,omitempty"`
 	Operations       []Operation       `json:"operations"`
@@ -48,10 +50,26 @@ func BuildInstallPlan(app catalog.Application, request InstallRequest) (Plan, er
 		return Plan{}, fmt.Errorf("instance must contain only lowercase letters, numbers, and single hyphens")
 	}
 
+	requestValues := make(map[string]string)
+	minimumRAM := 0
+	if request.Preset != "" {
+		preset, exists := app.Presets[request.Preset]
+		if !exists {
+			return Plan{}, fmt.Errorf("preset %q is not available for %s", request.Preset, app.Metadata.ID)
+		}
+		for key, value := range preset.Values {
+			requestValues[key] = value
+		}
+		minimumRAM = preset.MinimumRAM
+	}
+	for key, value := range request.Values {
+		requestValues[key] = value
+	}
+
 	values := make(map[string]string, len(app.Configuration))
 	secretReferences := make(map[string]string)
 	for _, field := range app.Configuration {
-		value := request.Values[field.Key]
+		value := requestValues[field.Key]
 		if value == "" {
 			value = field.Default
 		}
@@ -77,6 +95,7 @@ func BuildInstallPlan(app catalog.Application, request InstallRequest) (Plan, er
 		Application:      app.Metadata.ID,
 		Version:          app.Release.Version,
 		InstanceID:       instanceID,
+		MinimumRAMMB:     minimumRAM,
 		Configuration:    sortedMap(values),
 		SecretReferences: sortedMap(secretReferences),
 		Operations: []Operation{
