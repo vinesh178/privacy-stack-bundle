@@ -118,6 +118,7 @@ IMMICH_DB_NAME=immich
 
 # ---- PAPERLESS-NGX (Documents) ----
 PAPERLESS_DB_PASSWORD=${PAPERLESS_DB_PW}
+PAPERLESS_DB_USER=postgres
 PAPERLESS_ADMIN_USER=admin
 PAPERLESS_ADMIN_PASSWORD=${PAPERLESS_ADMIN_PW}
 PAPERLESS_SECRET_KEY=${PAPERLESS_SECRET}
@@ -158,6 +159,10 @@ Paperless-ngx:
 Vaultwarden:
   URL:      http://${SERVER_IP}:8080
   Admin Token: ${VAULT_TOKEN}
+
+Uptime Kuma:
+  URL:      http://${SERVER_IP}:3001
+  First run: create the admin account, then add the monitors listed in README.md.
 
 Server IP: ${SERVER_IP}
 ============================================
