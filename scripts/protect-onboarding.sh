@@ -16,7 +16,10 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-PUBLIC_INTERFACE=$(ip route show default | awk 'NR==1 {print $5}')
+PUBLIC_INTERFACE=$(
+  ip route show default |
+    awk 'NR == 1 {for (i = 1; i <= NF; i++) if ($i == "dev") {print $(i + 1); exit}}'
+)
 if [ -z "$PUBLIC_INTERFACE" ]; then
   echo "Could not identify the public network interface."
   exit 1
@@ -27,7 +30,10 @@ case "$PUBLIC_INTERFACE" in
     exit 1
     ;;
 esac
-PUBLIC_INTERFACE_V6=$(ip -6 route show default | awk 'NR==1 {print $5}')
+PUBLIC_INTERFACE_V6=$(
+  ip -6 route show default |
+    awk 'NR == 1 {for (i = 1; i <= NF; i++) if ($i == "dev") {print $(i + 1); exit}}'
+)
 case "$PUBLIC_INTERFACE_V6" in
   ""|lo|tailscale0|docker0|br-*)
     [ -z "$PUBLIC_INTERFACE_V6" ] || {
@@ -65,8 +71,11 @@ apply_ipv4_rules() {
 
 apply_ipv6_rules() {
   [ -n "$PUBLIC_INTERFACE_V6" ] || return 0
-  command -v ip6tables >/dev/null 2>&1 || return 0
-  ip6tables -L INPUT >/dev/null 2>&1 || return 0
+  if ! command -v ip6tables >/dev/null 2>&1 ||
+    ! ip6tables -L INPUT >/dev/null 2>&1; then
+    echo "Public IPv6 is present, but its firewall is unavailable; refusing to continue."
+    return 1
+  fi
 
   ip6tables -N PRIVACY_STACK_INPUT 2>/dev/null || true
   ip6tables -F PRIVACY_STACK_INPUT

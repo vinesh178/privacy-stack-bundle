@@ -47,8 +47,14 @@ fi
 . scripts/lib/env.sh
 load_privacy_env .env
 
-PUBLIC_INTERFACE=$(ip route show default | awk 'NR==1 {print $5}')
-PUBLIC_INTERFACE_V6=$(ip -6 route show default | awk 'NR==1 {print $5}')
+PUBLIC_INTERFACE=$(
+  ip route show default |
+    awk 'NR == 1 {for (i = 1; i <= NF; i++) if ($i == "dev") {print $(i + 1); exit}}'
+)
+PUBLIC_INTERFACE_V6=$(
+  ip -6 route show default |
+    awk 'NR == 1 {for (i = 1; i <= NF; i++) if ($i == "dev") {print $(i + 1); exit}}'
+)
 TAILSCALE_IP=$(docker exec tailscale tailscale ip -4 2>/dev/null | head -1 || true)
 EXPECTED_PROFILES="docs,media,dns,monitoring,dashboard,vpn"
 

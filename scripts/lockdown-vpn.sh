@@ -28,7 +28,10 @@ if [ "$APPLY_ONLY" != true ] && [ -z "$TAILSCALE_IP" ]; then
   exit 1
 fi
 
-PUBLIC_INTERFACE=$(ip route show default | awk 'NR==1 {print $5}')
+PUBLIC_INTERFACE=$(
+  ip route show default |
+    awk 'NR == 1 {for (i = 1; i <= NF; i++) if ($i == "dev") {print $(i + 1); exit}}'
+)
 if [ -z "$PUBLIC_INTERFACE" ]; then
   echo "Could not identify the public network interface."
   exit 1
@@ -39,7 +42,10 @@ case "$PUBLIC_INTERFACE" in
     exit 1
     ;;
 esac
-PUBLIC_INTERFACE_V6=$(ip -6 route show default | awk 'NR==1 {print $5}')
+PUBLIC_INTERFACE_V6=$(
+  ip -6 route show default |
+    awk 'NR == 1 {for (i = 1; i <= NF; i++) if ($i == "dev") {print $(i + 1); exit}}'
+)
 case "$PUBLIC_INTERFACE_V6" in
   ""|lo|tailscale0|docker0|br-*)
     [ -z "$PUBLIC_INTERFACE_V6" ] || {
@@ -74,9 +80,12 @@ iptables -N DOCKER-USER 2>/dev/null || true
 while iptables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
 iptables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
 
-if command -v ip6tables >/dev/null 2>&1 &&
-  ip6tables -L INPUT >/dev/null 2>&1 &&
-  [ -n "$PUBLIC_INTERFACE_V6" ]; then
+if [ -n "$PUBLIC_INTERFACE_V6" ]; then
+  if ! command -v ip6tables >/dev/null 2>&1 ||
+    ! ip6tables -L INPUT >/dev/null 2>&1; then
+    echo "Public IPv6 is present, but its firewall is unavailable; refusing to continue."
+    exit 1
+  fi
   ip6tables -N PRIVACY_STACK_INPUT 2>/dev/null || true
   ip6tables -F PRIVACY_STACK_INPUT
   ip6tables -A PRIVACY_STACK_INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT

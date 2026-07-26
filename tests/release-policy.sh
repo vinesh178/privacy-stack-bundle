@@ -84,8 +84,12 @@ for invariant in \
 done
 
 for firewall_script in scripts/protect-onboarding.sh scripts/lockdown-vpn.sh; do
-  grep -Fq 'PUBLIC_INTERFACE_V6=$(ip -6 route show default' "$firewall_script" ||
+  grep -Fq 'ip -6 route show default' "$firewall_script" ||
     fail "$firewall_script does not resolve the IPv6 public interface independently"
+  grep -Fq 'if ($i == "dev")' "$firewall_script" ||
+    fail "$firewall_script relies on a positional default-route field"
+  grep -Fq 'Public IPv6 is present, but its firewall is unavailable' "$firewall_script" ||
+    fail "$firewall_script fails open when the IPv6 firewall is unavailable"
 done
 
 echo "Release security policy passed."
