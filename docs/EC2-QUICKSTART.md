@@ -95,6 +95,8 @@ sudo docker compose logs --tail=100
 ```
 
 Open the application URLs using the Tailscale IP printed at the end of setup.
+If an application or monitor fails, follow the exact checks in
+[Troubleshooting](TROUBLESHOOTING.md).
 
 ### Use AdGuard from any Wi-Fi
 

@@ -12,6 +12,11 @@ ROOT_DIR=$(cd "$(dirname "$0")" && pwd)
 cd "$ROOT_DIR"
 . scripts/lib/platform.sh
 
+SSH_USER="${SUDO_USER:-$(logname 2>/dev/null || true)}"
+if [ -z "$SSH_USER" ] || [ "$SSH_USER" = "root" ]; then
+  SSH_USER="<server-user>"
+fi
+
 RESUME=0
 case "${1:-}" in
   "") ;;
@@ -191,7 +196,7 @@ echo "Tailscale address: $TAILSCALE_IP"
 echo ""
 echo "Before public access is disabled:"
 echo "  1. Open a second terminal."
-echo "  2. Confirm this works: ssh $(logname 2>/dev/null || echo ubuntu)@$TAILSCALE_IP"
+echo "  2. Confirm this works: ssh $SSH_USER@$TAILSCALE_IP"
 echo "  3. Return here and type LOCKDOWN."
 echo ""
 read -r -p "Type LOCKDOWN after VPN SSH works: " CONFIRMATION </dev/tty
@@ -207,6 +212,11 @@ bash scripts/lockdown-vpn.sh
 echo ""
 echo -e "${GREEN}Opinionated Privacy Stack installation completed.${NC}"
 echo "Use the Tailscale IP for SSH and application access: $TAILSCALE_IP"
+echo ""
+echo "Connect to this server through Tailscale:"
+echo "  ssh $SSH_USER@$TAILSCALE_IP"
+echo "If your EC2 private key is not loaded in your SSH agent:"
+echo "  ssh -i /path/to/private-key.pem $SSH_USER@$TAILSCALE_IP"
 echo ""
 echo "Finish Uptime Kuma:"
 echo "  1. Open http://$TAILSCALE_IP:3001 and create its admin account."
