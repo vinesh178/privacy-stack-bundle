@@ -70,4 +70,26 @@ decrypt_detection_line=$(grep -n "head -c 24" scripts/restore.sh | head -1 | cut
 [ -n "$age_install_line" ] && [ "$age_install_line" -lt "$decrypt_detection_line" ] ||
   fail "fresh-server restore checks encrypted input before installing age"
 
+for invariant in \
+  'systemctl is-active --quiet privacy-stack-vpn-lockdown.service' \
+  'iptables -C DOCKER-USER' \
+  'ip6tables -C DOCKER-USER' \
+  'installed commit exactly matches origin/main' \
+  'git fetch --quiet origin main' \
+  'git ls-files --others --exclude-standard' \
+  'dig @PUBLIC_IP example.com A' \
+  'AdGuard resolves DNS through Tailscale'; do
+  grep -Fq "$invariant" scripts/release-acceptance.sh ||
+    fail "post-reboot acceptance gate omits: $invariant"
+done
+
+for firewall_script in scripts/protect-onboarding.sh scripts/lockdown-vpn.sh; do
+  grep -Fq 'ip -o -6 address show scope global' "$firewall_script" ||
+    fail "$firewall_script does not protect globally addressed IPv6 interfaces"
+  grep -Fq 'Public IPv6 is present, but its firewall is unavailable' "$firewall_script" ||
+    fail "$firewall_script fails open when the IPv6 firewall is unavailable"
+  grep -Fq 'RequiredBy=docker.service' "$firewall_script" ||
+    fail "$firewall_script failure does not prevent Docker from starting"
+done
+
 echo "Release security policy passed."
