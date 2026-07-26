@@ -4,12 +4,23 @@
 set -euo pipefail
 
 GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
 ROOT_DIR=$(cd "$(dirname "$0")" && pwd)
 cd "$ROOT_DIR"
 . scripts/lib/platform.sh
+
+RESUME=0
+case "${1:-}" in
+  "") ;;
+  --resume) RESUME=1 ;;
+  *)
+    echo "Usage: sudo bash setup-server.sh [--resume]"
+    exit 1
+    ;;
+esac
 
 if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}Run this command with sudo:${NC}"
@@ -38,45 +49,86 @@ if [ "${AVAILABLE_DISK_KB:-0}" -lt 40000000 ]; then
   exit 1
 fi
 
-if [ -f .env ]; then
+if [ -f .env ] && [ "$RESUME" -ne 1 ]; then
   echo -e "${RED}An existing Privacy Stack configuration was found.${NC}"
   echo "This command is only for a fresh server and will not overwrite it."
+  echo "To continue an interrupted setup: sudo bash setup-server.sh --resume"
   exit 1
 fi
 
-. configs/opinionated.env
-export COMPOSE_PROFILES="$PRIVACY_STACK_PROFILES"
+if [ "$RESUME" -eq 1 ] && [ ! -f .env ]; then
+  echo -e "${RED}No existing Privacy Stack configuration was found to resume.${NC}"
+  echo "Start a fresh installation with: sudo bash setup-server.sh"
+  exit 1
+fi
 
-echo ""
-echo "Privacy Stack — Fresh Server Setup"
-echo "=================================="
-echo ""
-echo "This installs:"
-echo "  Photos      Immich"
-echo "  Documents   Paperless-ngx"
-echo "  Media       Jellyfin"
-echo "  DNS         AdGuard Home"
-echo "  Passwords   Vaultwarden"
-echo "  Monitoring  Uptime Kuma"
-echo "  Dashboard   Homepage"
-echo "  Proxy       Nginx Proxy Manager"
-echo "  VPN         Tailscale"
-echo ""
+if [ "$RESUME" -eq 1 ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . ./.env
+  set +a
+  echo ""
+  echo "Resuming Privacy Stack setup..."
+else
+  . configs/opinionated.env
+  export COMPOSE_PROFILES="$PRIVACY_STACK_PROFILES"
 
-bash scripts/setup.sh
+  echo ""
+  echo "Privacy Stack — Fresh Server Setup"
+  echo "=================================="
+  echo ""
+  echo "This installs:"
+  echo "  Photos      Immich"
+  echo "  Documents   Paperless-ngx"
+  echo "  Media       Jellyfin"
+  echo "  DNS         AdGuard Home"
+  echo "  Passwords   Vaultwarden"
+  echo "  Monitoring  Uptime Kuma"
+  echo "  Dashboard   Homepage"
+  echo "  Proxy       Nginx Proxy Manager"
+  echo "  VPN         Tailscale"
+  echo ""
+
+  DEFER_ACCESS_ONBOARDING=1 bash scripts/setup.sh
+fi
+
+resume_after_interrupt() {
+  echo ""
+  echo -e "${YELLOW}Setup interrupted. Public access has not been disabled.${NC}"
+  echo "Continue without overwriting the stack:"
+  echo "  sudo bash $ROOT_DIR/setup-server.sh --resume"
+  exit 130
+}
+
+get_tailscale_ip() {
+  docker exec tailscale tailscale ip -4 2>/dev/null | head -1 || true
+}
+
+trap resume_after_interrupt INT TERM
 
 echo ""
 echo "Connecting this server to Tailscale..."
-TAILSCALE_IP=$(docker exec tailscale tailscale ip -4 2>/dev/null | head -1 || true)
+TAILSCALE_IP=$(get_tailscale_ip)
 if [ -z "$TAILSCALE_IP" ]; then
-  docker exec -it tailscale tailscale up --accept-dns=false </dev/tty >/dev/tty 2>&1
-  TAILSCALE_IP=$(docker exec tailscale tailscale ip -4 2>/dev/null | head -1 || true)
+  echo "Open the login URL below and approve the privacy-stack device."
+  if ! docker exec -it tailscale tailscale up --accept-dns=false </dev/tty >/dev/tty 2>&1; then
+    echo -e "${YELLOW}The login command disconnected; waiting for browser approval...${NC}"
+  fi
+  for _ in $(seq 1 60); do
+    TAILSCALE_IP=$(get_tailscale_ip)
+    [ -n "$TAILSCALE_IP" ] && break
+    sleep 5
+  done
 else
   docker exec tailscale tailscale set --accept-dns=false
 fi
 
 if [ -z "$TAILSCALE_IP" ]; then
   echo -e "${RED}Tailscale did not provide a VPN address. Public access has not been disabled.${NC}"
+  echo "After approving the device, verify it with:"
+  echo "  sudo docker exec tailscale tailscale ip -4"
+  echo "Then continue safely with:"
+  echo "  sudo bash setup-server.sh --resume"
   exit 1
 fi
 
@@ -125,6 +177,7 @@ if [ "$CONFIRMATION" != "LOCKDOWN" ]; then
   exit 1
 fi
 
+trap - INT TERM
 bash scripts/lockdown-vpn.sh
 
 echo ""
