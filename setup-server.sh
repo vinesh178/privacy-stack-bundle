@@ -33,22 +33,6 @@ if ! platform_preflight; then
   exit 1
 fi
 
-platform_install_prerequisites
-
-AVAILABLE_MEMORY_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
-if [ "${AVAILABLE_MEMORY_KB:-0}" -lt 7000000 ]; then
-  echo -e "${RED}This setup requires at least 8 GB RAM.${NC}"
-  echo "On AWS, choose any available x86 general-purpose instance with at least 8 GiB memory."
-  exit 1
-fi
-
-AVAILABLE_DISK_KB=$(df -Pk "$ROOT_DIR" | awk 'NR==2 {print $4}')
-if [ "${AVAILABLE_DISK_KB:-0}" -lt 40000000 ]; then
-  echo -e "${RED}This setup requires at least 40 GB of free disk space.${NC}"
-  echo "Use a 60 GB or larger server disk."
-  exit 1
-fi
-
 if [ -f .env ] && [ "$RESUME" -ne 1 ]; then
   echo -e "${RED}An existing Privacy Stack configuration was found.${NC}"
   echo "This command is only for a fresh server and will not overwrite it."
@@ -62,11 +46,52 @@ if [ "$RESUME" -eq 1 ] && [ ! -f .env ]; then
   exit 1
 fi
 
+if [ "$RESUME" -ne 1 ]; then
+  platform_install_prerequisites
+
+  AVAILABLE_MEMORY_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+  if [ "${AVAILABLE_MEMORY_KB:-0}" -lt 7000000 ]; then
+    echo -e "${RED}This setup requires at least 8 GB RAM.${NC}"
+    echo "On AWS, choose any available x86 general-purpose instance with at least 8 GiB memory."
+    exit 1
+  fi
+
+  AVAILABLE_DISK_KB=$(df -Pk "$ROOT_DIR" | awk 'NR==2 {print $4}')
+  if [ "${AVAILABLE_DISK_KB:-0}" -lt 20000000 ]; then
+    echo -e "${RED}This setup requires at least 20 GB of free disk space.${NC}"
+    echo "Use a 40 GB or larger server disk."
+    exit 1
+  fi
+fi
+
 if [ "$RESUME" -eq 1 ]; then
   set -a
   # shellcheck disable=SC1091
   . ./.env
   set +a
+
+  if [[ ",${COMPOSE_PROFILES:-}," == *",photos,"* ]]; then
+    echo "Removing Immich from the opinionated stack (data volumes are preserved)..."
+    docker compose --profile photos rm --stop --force \
+      immich-server immich-machine-learning immich-redis immich-postgres
+    docker image rm \
+      ghcr.io/immich-app/immich-server:release \
+      ghcr.io/immich-app/immich-machine-learning:release \
+      tensorchord/pgvecto-rs:pg16-v0.2.0 >/dev/null 2>&1 || true
+    COMPOSE_PROFILES=$(awk -v profiles="$COMPOSE_PROFILES" 'BEGIN {
+      count = split(profiles, profile, ",")
+      separator = ""
+      for (i = 1; i <= count; i++) {
+        if (profile[i] != "photos" && profile[i] != "") {
+          printf "%s%s", separator, profile[i]
+          separator = ","
+        }
+      }
+    }')
+    export COMPOSE_PROFILES
+    sed -i "s|^COMPOSE_PROFILES=.*|COMPOSE_PROFILES=$COMPOSE_PROFILES|" .env
+  fi
+
   echo ""
   echo "Resuming Privacy Stack setup..."
 else
@@ -78,7 +103,6 @@ else
   echo "=================================="
   echo ""
   echo "This installs:"
-  echo "  Photos      Immich"
   echo "  Documents   Paperless-ngx"
   echo "  Media       Jellyfin"
   echo "  DNS         AdGuard Home"

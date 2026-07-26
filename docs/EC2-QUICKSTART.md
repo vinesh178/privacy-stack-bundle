@@ -12,7 +12,7 @@ In the AWS EC2 console, choose **Launch instance** and use:
 - Instance type: choose an x86 general-purpose type showing at least **8 GiB
   memory** in your selected Region. `t3.large` is a common option, but instance
   availability varies by Region and Availability Zone.
-- Storage: 60 GB gp3
+- Storage: 40 GB gp3
 - Key pair: create or select an RSA `.pem` key
 - Security group: allow SSH from **My IP** only
 
@@ -50,7 +50,6 @@ lock you out.
 
 Installation can take 10–20 minutes. The installer configures:
 
-- Immich
 - Paperless-ngx
 - Jellyfin
 - AdGuard Home
