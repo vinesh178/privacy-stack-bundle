@@ -7,7 +7,8 @@ cd /opt/privacy-stack
 ```
 
 For a single read-only summary of all Tailscale addresses, peers, SSH and
-application URLs, Nginx targets, DNS details, and Kuma monitor URLs, run:
+application URLs, optional reverse-proxy targets, DNS details, and Kuma monitor
+URLs, run:
 
 ```bash
 sudo bash scripts/network-info.sh
@@ -123,9 +124,7 @@ Open `http://TAILSCALE-IP:3001`, create the account, then add HTTP(s) monitors:
 |---|---|
 | Paperless | `http://paperless:8000` |
 | Jellyfin | `http://jellyfin:8096` |
-| Vaultwarden | `http://vaultwarden:80` |
 | Homepage | `http://homepage:3000` |
-| Nginx Proxy Manager | `http://nginx-proxy-manager:81` |
 | AdGuard | `http://adguard:80` |
 
 AdGuard should be added only after its first-run wizard is complete. Kuma checks
@@ -139,9 +138,7 @@ sudo docker exec uptime_kuma node -e "
 const services = {
   Paperless: 'http://paperless:8000',
   Jellyfin: 'http://jellyfin:8096',
-  Vaultwarden: 'http://vaultwarden:80',
   Homepage: 'http://homepage:3000',
-  'Proxy Manager': 'http://nginx-proxy-manager:81',
   AdGuard: 'http://adguard:80'
 };
 for (const [name, url] of Object.entries(services)) {

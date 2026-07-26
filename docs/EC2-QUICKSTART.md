@@ -53,10 +53,8 @@ Installation can take 10–20 minutes. The installer configures:
 - Paperless-ngx
 - Jellyfin
 - AdGuard Home
-- Vaultwarden
 - Uptime Kuma
 - Homepage
-- Nginx Proxy Manager
 - Tailscale
 
 The setup displays a Tailscale login link. After login, it pauses for the

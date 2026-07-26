@@ -75,19 +75,28 @@ if [ "$RESUME" -eq 1 ]; then
   . ./.env
   set +a
 
-  if [[ ",${COMPOSE_PROFILES:-}," == *",photos,"* ]]; then
-    echo "Removing Immich from the opinionated stack (data volumes are preserved)..."
-    docker compose --profile photos rm --stop --force \
-      immich-server immich-machine-learning immich-redis immich-postgres
-    docker image rm \
-      ghcr.io/immich-app/immich-server:release \
-      ghcr.io/immich-app/immich-machine-learning:release \
-      tensorchord/pgvecto-rs:pg16-v0.2.0 >/dev/null 2>&1 || true
+  RETIRED_PROFILES=""
+
+  if [[ ",${COMPOSE_PROFILES:-}," == *",passwords,"* ]]; then
+    echo "Removing Vaultwarden from the HTTP-only MVP (data is preserved)..."
+    docker compose --profile passwords rm --stop --force vaultwarden
+    RETIRED_PROFILES="${RETIRED_PROFILES:+$RETIRED_PROFILES,}passwords"
+  fi
+
+  if [[ ",${COMPOSE_PROFILES:-}," == *",proxy,"* ]] ||
+    docker inspect npm >/dev/null 2>&1; then
+    echo "Removing Nginx Proxy Manager from the no-domain MVP (data is preserved)..."
+    docker compose --profile proxy rm --stop --force nginx-proxy-manager
+    RETIRED_PROFILES="${RETIRED_PROFILES:+$RETIRED_PROFILES,}proxy"
+  fi
+
+  if [ -n "$RETIRED_PROFILES" ]; then
     COMPOSE_PROFILES=$(awk -v profiles="$COMPOSE_PROFILES" 'BEGIN {
       count = split(profiles, profile, ",")
       separator = ""
       for (i = 1; i <= count; i++) {
-        if (profile[i] != "photos" && profile[i] != "") {
+        if (profile[i] != "passwords" &&
+            profile[i] != "proxy" && profile[i] != "") {
           printf "%s%s", separator, profile[i]
           separator = ","
         }
@@ -111,10 +120,8 @@ else
   echo "  Documents   Paperless-ngx"
   echo "  Media       Jellyfin"
   echo "  DNS         AdGuard Home"
-  echo "  Passwords   Vaultwarden"
   echo "  Monitoring  Uptime Kuma"
   echo "  Dashboard   Homepage"
-  echo "  Proxy       Nginx Proxy Manager"
   echo "  VPN         Tailscale"
   echo ""
 
@@ -246,7 +253,5 @@ echo "  1. Open http://$TAILSCALE_IP:3001 and create its admin account."
 echo "  2. Add HTTP monitors for:"
 echo "     Paperless      http://paperless:8000"
 echo "     Jellyfin       http://jellyfin:8096"
-echo "     Vaultwarden    http://vaultwarden:80"
 echo "     Homepage       http://homepage:3000"
-echo "     Proxy Manager  http://nginx-proxy-manager:81"
 echo "     AdGuard        http://adguard:80"

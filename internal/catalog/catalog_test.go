@@ -14,8 +14,8 @@ func TestLoadManifestReturnsValidatedApplication(t *testing.T) {
 apiVersion: install.run/v1
 kind: Application
 metadata:
-  id: immich
-  name: Immich
+  id: paperless
+  name: Paperless
 release:
   version: 1.133.0
 deployment:
@@ -23,7 +23,7 @@ deployment:
   primaryService: server
   ingress:
     service: server
-    port: 2283
+    port: 8000
 configuration:
   - key: domain
     type: hostname
@@ -35,11 +35,11 @@ configuration:
 		t.Fatalf("LoadManifest() error = %v", err)
 	}
 
-	if app.Metadata.ID != "immich" {
-		t.Fatalf("Metadata.ID = %q, want immich", app.Metadata.ID)
+	if app.Metadata.ID != "paperless" {
+		t.Fatalf("Metadata.ID = %q, want paperless", app.Metadata.ID)
 	}
-	if app.Deployment.Ingress.Port != 2283 {
-		t.Fatalf("Ingress.Port = %d, want 2283", app.Deployment.Ingress.Port)
+	if app.Deployment.Ingress.Port != 8000 {
+		t.Fatalf("Ingress.Port = %d, want 8000", app.Deployment.Ingress.Port)
 	}
 }
 

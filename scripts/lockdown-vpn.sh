@@ -3,6 +3,14 @@
 
 set -euo pipefail
 
+APPLY_ONLY=false
+if [ "${1:-}" = "--apply-only" ]; then
+  APPLY_ONLY=true
+elif [ -n "${1:-}" ]; then
+  echo "Usage: sudo bash scripts/lockdown-vpn.sh [--apply-only]"
+  exit 1
+fi
+
 if [ "$EUID" -ne 0 ]; then
   echo "Run with sudo: sudo bash scripts/lockdown-vpn.sh"
   exit 1
@@ -51,7 +59,8 @@ iptables -A PRIVACY_STACK_DOCKER -j DROP
 while iptables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_DOCKER 2>/dev/null; do :; done
 iptables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_DOCKER
 
-if command -v ip6tables >/dev/null 2>&1; then
+if command -v ip6tables >/dev/null 2>&1 &&
+  ip6tables -L INPUT >/dev/null 2>&1; then
   ip6tables -N PRIVACY_STACK_INPUT 2>/dev/null || true
   ip6tables -F PRIVACY_STACK_INPUT
   ip6tables -A PRIVACY_STACK_INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -72,6 +81,8 @@ if command -v ip6tables >/dev/null 2>&1; then
   fi
 fi
 
+[ "$APPLY_ONLY" = true ] && exit 0
+
 SCRIPT_PATH=$(readlink -f "$0")
 cat > /etc/systemd/system/privacy-stack-vpn-lockdown.service <<EOF
 [Unit]
@@ -81,7 +92,7 @@ Wants=docker.service network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash $SCRIPT_PATH
+ExecStart=/bin/bash $SCRIPT_PATH --apply-only
 Restart=on-failure
 RestartSec=10
 
@@ -91,6 +102,7 @@ EOF
 
 systemctl daemon-reload
 systemctl enable privacy-stack-vpn-lockdown.service >/dev/null
+systemctl disable privacy-stack-onboarding-firewall.service >/dev/null 2>&1 || true
 
 echo "Public ingress disabled."
 echo "VPN address: $TAILSCALE_IP"

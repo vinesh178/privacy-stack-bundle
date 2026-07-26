@@ -28,7 +28,7 @@ fi
 NPM_URL="http://localhost:81"
 NPM_DEFAULT_EMAIL="admin@example.com"
 NPM_DEFAULT_PASS="changeme"
-PROFILES="${COMPOSE_PROFILES:-photos,docs,media,dns,passwords,monitoring,dashboard,vpn}"
+PROFILES="${COMPOSE_PROFILES:-proxy,docs,media,dns,passwords,monitoring,dashboard,vpn}"
 
 has_profile() {
   [[ ",$PROFILES," == *",$1,"* ]]
@@ -175,7 +175,6 @@ create_proxy_host() {
 
 # Service mapping: profile|subdomain|container_name|port
 PROXY_HOSTS=(
-  "photos|photos|immich_server|2283"
   "docs|docs|paperless|8000"
   "media|media|jellyfin|8096"
   "dns|dns|adguard|80"

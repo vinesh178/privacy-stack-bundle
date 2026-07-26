@@ -21,7 +21,7 @@ if [ -f "${INSTALL_DIR}/.env" ]; then
   set +a
 fi
 
-PROFILES="${COMPOSE_PROFILES:-photos,docs,media,dns,passwords,monitoring,dashboard,vpn}"
+PROFILES="${COMPOSE_PROFILES:-docs,media,dns,monitoring,dashboard,vpn}"
 
 has_profile() {
   [[ ",$PROFILES," == *",$1,"* ]]
@@ -79,14 +79,7 @@ echo ""
 
 # ---- Container Status ----
 echo "Container Status:"
-check_container "Nginx Proxy Manager" "npm"
-
-if has_profile "photos"; then
-  check_container "Immich Server" "immich_server"
-  check_container "Immich ML" "immich_ml"
-  check_container "Immich Redis" "immich_redis"
-  check_container "Immich Postgres" "immich_postgres"
-fi
+has_profile "proxy"      && check_container "Nginx Proxy Manager" "npm"
 
 if has_profile "docs"; then
   check_container "Paperless" "paperless"
@@ -106,8 +99,7 @@ echo ""
 
 # ---- HTTP Endpoints ----
 echo "HTTP Endpoints:"
-check_service "Nginx Proxy Manager" "http://localhost:81"
-has_profile "photos"     && check_service "Immich" "http://localhost:2283"
+has_profile "proxy"      && check_service "Nginx Proxy Manager" "http://localhost:81"
 has_profile "docs"       && check_service "Paperless" "http://localhost:8000"
 has_profile "media"      && check_service "Jellyfin" "http://localhost:8096"
 has_profile "dns"        && check_service "AdGuard Home" "http://localhost:3003"
@@ -161,8 +153,7 @@ if [ $FAIL -eq 0 ]; then
   echo -e "${GREEN}All services healthy!${NC}"
   echo ""
   echo "Access your stack:"
-  echo "  NPM:        http://$IP:81"
-  has_profile "photos"     && echo "  Photos:     http://$IP:2283"
+  has_profile "proxy"      && echo "  NPM:        http://$IP:81"
   has_profile "docs"       && echo "  Documents:  http://$IP:8000"
   has_profile "media"      && echo "  Media:      http://$IP:8096"
   has_profile "dns"        && echo "  DNS/Ads:    http://$IP:3003"
