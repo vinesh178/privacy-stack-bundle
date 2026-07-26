@@ -35,6 +35,7 @@ jobs:
       - name: Compose and release policy
         run: |
           bash tests/env-parser.sh
+          bash tests/prompt-confirmation.sh
           bash tests/release-policy.sh
       - name: Backup and restore round trip
         run: |

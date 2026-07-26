@@ -12,6 +12,7 @@ ROOT_DIR=$(cd "$(dirname "$0")" && pwd)
 cd "$ROOT_DIR"
 . scripts/lib/platform.sh
 . scripts/lib/env.sh
+. scripts/lib/prompts.sh
 
 SSH_USER="${SUDO_USER:-$(logname 2>/dev/null || true)}"
 if [ -z "$SSH_USER" ] || [ "$SSH_USER" = "root" ]; then
@@ -215,8 +216,9 @@ else
   echo "  4. After saving, use http://$TAILSCALE_IP:3003 for the dashboard."
   echo "  5. Return here and type ADGUARD."
   echo ""
-  read -r -p "Type ADGUARD after its setup wizard is complete: " ADGUARD_CONFIRMATION </dev/tty
-  if [ "$ADGUARD_CONFIRMATION" != "ADGUARD" ]; then
+  if ! confirm_exact \
+    "ADGUARD" \
+    "Type ADGUARD after its setup wizard is complete: " </dev/tty; then
     echo -e "${RED}AdGuard setup was not confirmed; public access has not been disabled.${NC}"
     exit 1
   fi
@@ -232,8 +234,9 @@ echo "  1. Open a second terminal."
 echo "  2. Confirm this works: ssh $SSH_USER@$TAILSCALE_IP"
 echo "  3. Return here and type LOCKDOWN."
 echo ""
-read -r -p "Type LOCKDOWN after VPN SSH works: " CONFIRMATION </dev/tty
-if [ "$CONFIRMATION" != "LOCKDOWN" ]; then
+if ! confirm_exact \
+  "LOCKDOWN" \
+  "Type LOCKDOWN after VPN SSH works: " </dev/tty; then
   echo -e "${RED}Lockdown cancelled. Public SSH remains available.${NC}"
   echo "Run this after confirming VPN access: sudo bash scripts/lockdown-vpn.sh"
   exit 1
