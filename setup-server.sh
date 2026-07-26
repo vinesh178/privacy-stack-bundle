@@ -11,6 +11,7 @@ NC='\033[0m'
 ROOT_DIR=$(cd "$(dirname "$0")" && pwd)
 cd "$ROOT_DIR"
 . scripts/lib/platform.sh
+. scripts/lib/env.sh
 
 SSH_USER="${SUDO_USER:-$(logname 2>/dev/null || true)}"
 if [ -z "$SSH_USER" ] || [ "$SSH_USER" = "root" ]; then
@@ -30,6 +31,13 @@ esac
 if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}Run this command with sudo:${NC}"
   echo "  sudo bash setup-server.sh"
+  exit 1
+fi
+
+OPERATION_LOCK="${PRIVACY_STACK_LOCK_FILE:-/var/lock/privacy-stack-operation.lock}"
+exec 9>"$OPERATION_LOCK"
+if ! flock -n 9; then
+  echo -e "${RED}Another Privacy Stack operation is already running.${NC}"
   exit 1
 fi
 
@@ -70,10 +78,7 @@ if [ "$RESUME" -ne 1 ]; then
 fi
 
 if [ "$RESUME" -eq 1 ]; then
-  set -a
-  # shellcheck disable=SC1091
-  . ./.env
-  set +a
+  load_privacy_env ./.env
 
   RETIRED_PROFILES=""
 
@@ -109,7 +114,7 @@ if [ "$RESUME" -eq 1 ]; then
   echo ""
   echo "Resuming Privacy Stack setup..."
 else
-  . configs/opinionated.env
+  . configs/opinionated.conf
   export COMPOSE_PROFILES="$PRIVACY_STACK_PROFILES"
 
   echo ""

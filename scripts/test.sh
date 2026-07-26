@@ -16,9 +16,9 @@ INSTALL_DIR="${INSTALL_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 
 # Source .env for profile and IP info
 if [ -f "${INSTALL_DIR}/.env" ]; then
-  set -a
-  source "${INSTALL_DIR}/.env"
-  set +a
+  # shellcheck disable=SC1091
+  . "${INSTALL_DIR}/scripts/lib/env.sh"
+  load_privacy_env "${INSTALL_DIR}/.env"
 fi
 
 PROFILES="${COMPOSE_PROFILES:-docs,media,dns,monitoring,dashboard,vpn}"
@@ -45,8 +45,8 @@ check_service() {
     echo -e "  ${RED}$name${NC} — Connection refused (not running?)"
     FAIL=$((FAIL + 1))
   else
-    echo -e "  ${YELLOW}$name${NC} — HTTP $code (expected $expected_code)"
-    WARN=$((WARN + 1))
+    echo -e "  ${RED}$name${NC} — HTTP $code (expected $expected_code)"
+    FAIL=$((FAIL + 1))
   fi
 }
 
@@ -132,13 +132,13 @@ echo ""
 # ---- Tailscale ----
 if has_profile "vpn"; then
   echo "Tailscale:"
-  ts_status=$(docker exec tailscale tailscale status --json 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('Self',{}).get('TailscaleIPs',['not connected'])[0])" 2>/dev/null || echo "not connected")
-  if [ "$ts_status" != "not connected" ]; then
+  ts_status=$(docker exec tailscale tailscale ip -4 2>/dev/null | head -1 || true)
+  if [ -n "$ts_status" ]; then
     echo -e "  ${GREEN}Connected${NC} — Tailscale IP: $ts_status"
     PASS=$((PASS + 1))
   else
-    echo -e "  ${YELLOW}Not connected${NC} — Run: docker exec tailscale tailscale up"
-    WARN=$((WARN + 1))
+    echo -e "  ${RED}Not connected${NC} — Run: docker exec tailscale tailscale up"
+    FAIL=$((FAIL + 1))
   fi
   echo ""
 fi

@@ -26,8 +26,9 @@ NC='\033[0m'
 
 INSTALL_DIR="${INSTALL_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$INSTALL_DIR"
-. configs/opinionated.env
+. configs/opinionated.conf
 . scripts/lib/platform.sh
+. scripts/lib/env.sh
 
 echo ""
 echo "Privacy Stack — Automated Setup"
@@ -164,9 +165,7 @@ else
 fi
 
 # ---- Source .env for the rest of setup ----
-set -a
-source .env
-set +a
+load_privacy_env .env
 
 DATA_DIR="${DATA_DIR:-/srv/privacy-stack}"
 PROFILES="${COMPOSE_PROFILES:-$PRIVACY_STACK_PROFILES}"
@@ -310,7 +309,7 @@ if [ "${DEFER_ACCESS_ONBOARDING:-0}" != "1" ]; then
   fi
 
   echo "Backup your stack:  sudo bash scripts/backup.sh"
-  echo "Restore from backup: sudo bash scripts/restore.sh /path/to/backup.tar.gz"
+  echo "Restore from backup: sudo bash scripts/restore.sh /path/to/backup.tar.gz.enc"
   echo "Health check:        bash scripts/test.sh"
   echo "============================================================"
 

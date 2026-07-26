@@ -10,13 +10,23 @@ NC='\033[0m'
 
 INSTALL_DIR="${INSTALL_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 HOT_BACKUP=false
+ENCRYPT_BACKUP=true
+PASSPHRASE_FILE=""
 BACKUP_PATH=""
 STACK_STOPPED=false
 TEMP_DIR=""
+PLAIN_ARCHIVE=""
+GENERATED_PASSPHRASE=""
 
 for arg in "$@"; do
   case "$arg" in
     --hot) HOT_BACKUP=true ;;
+    --unencrypted) ENCRYPT_BACKUP=false ;;
+    --passphrase-file)
+      echo "--passphrase-file requires a separate path argument." >&2
+      exit 1
+      ;;
+    --passphrase-file=*) PASSPHRASE_FILE=${arg#*=} ;;
     -*) echo "Unknown option: $arg" >&2; exit 1 ;;
     *) BACKUP_PATH="$arg" ;;
   esac
@@ -27,25 +37,36 @@ if [ "$EUID" -ne 0 ] && [ "${PRIVACY_STACK_TESTING:-0}" != "1" ]; then
   exit 1
 fi
 
+OPERATION_LOCK="${PRIVACY_STACK_LOCK_FILE:-/var/lock/privacy-stack-operation.lock}"
+exec 9>"$OPERATION_LOCK"
+if ! flock -n 9; then
+  echo -e "${RED}Another Privacy Stack operation is already running.${NC}"
+  exit 1
+fi
+
 if [ ! -f "$INSTALL_DIR/.env" ]; then
   echo -e "${RED}.env not found. Run setup first.${NC}"
   exit 1
 fi
 
-set -a
 # shellcheck disable=SC1091
-. "$INSTALL_DIR/.env"
-set +a
+. "$INSTALL_DIR/scripts/lib/env.sh"
+load_privacy_env "$INSTALL_DIR/.env"
 
 PROFILES="${COMPOSE_PROFILES:-docs,media,dns,monitoring,dashboard,vpn}"
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-privacy-stack}"
 BACKUP_DIR="${BACKUP_DIR:-/srv/backups/privacy-stack}"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-BACKUP_PATH="${BACKUP_PATH:-$BACKUP_DIR/privacy-stack-$TIMESTAMP.tar.gz}"
+if [ -z "$BACKUP_PATH" ]; then
+  BACKUP_PATH="$BACKUP_DIR/privacy-stack-$TIMESTAMP.tar.gz"
+  [ "$ENCRYPT_BACKUP" = true ] && BACKUP_PATH="$BACKUP_PATH.enc"
+fi
 TEMP_DIR=$(mktemp -d)
 
 cleanup() {
   local exit_code=$?
+  [ -n "$PLAIN_ARCHIVE" ] && rm -f "$PLAIN_ARCHIVE"
+  [ -n "$GENERATED_PASSPHRASE" ] && rm -f "$GENERATED_PASSPHRASE"
   [ -n "$TEMP_DIR" ] && rm -rf "$TEMP_DIR"
   if [ "$STACK_STOPPED" = true ]; then
     echo "Restarting containers..."
@@ -59,7 +80,8 @@ has_profile() {
   [[ ",$PROFILES," == *",$1,"* ]]
 }
 
-mkdir -p "$BACKUP_DIR" "$TEMP_DIR/volumes" "$TEMP_DIR/data" "$TEMP_DIR/config"
+mkdir -p "$BACKUP_DIR" "$(dirname "$BACKUP_PATH")" \
+  "$TEMP_DIR/volumes" "$TEMP_DIR/data" "$TEMP_DIR/config"
 cd "$INSTALL_DIR"
 
 echo "Privacy Stack backup"
@@ -141,12 +163,35 @@ cat > "$TEMP_DIR/manifest.json" <<EOF
 }
 EOF
 
-tar czf "$BACKUP_PATH" -C "$TEMP_DIR" .
+PLAIN_ARCHIVE=$(mktemp)
+tar czf "$PLAIN_ARCHIVE" -C "$TEMP_DIR" .
+if [ "$ENCRYPT_BACKUP" = true ]; then
+  if [ -z "$PASSPHRASE_FILE" ]; then
+    PASSPHRASE_FILE=$(mktemp)
+    GENERATED_PASSPHRASE="$PASSPHRASE_FILE"
+    read -r -s -p "Backup passphrase: " passphrase </dev/tty
+    echo
+    read -r -s -p "Confirm passphrase: " confirmation </dev/tty
+    echo
+    [ -n "$passphrase" ] && [ "$passphrase" = "$confirmation" ] ||
+      { echo -e "${RED}Passphrases are empty or do not match.${NC}"; exit 1; }
+    printf '%s' "$passphrase" > "$PASSPHRASE_FILE"
+    unset passphrase confirmation
+  fi
+  [ -f "$PASSPHRASE_FILE" ] ||
+    { echo -e "${RED}Passphrase file not found.${NC}"; exit 1; }
+  openssl enc -aes-256-cbc -salt -pbkdf2 -iter 600000 -md sha256 \
+    -pass "file:$PASSPHRASE_FILE" -in "$PLAIN_ARCHIVE" -out "$BACKUP_PATH"
+else
+  cp "$PLAIN_ARCHIVE" "$BACKUP_PATH"
+fi
+rm -f "$PLAIN_ARCHIVE"
 chmod 600 "$BACKUP_PATH"
 (cd "$(dirname "$BACKUP_PATH")" &&
   sha256sum "$(basename "$BACKUP_PATH")" > "$(basename "$BACKUP_PATH").sha256")
 chmod 600 "$BACKUP_PATH.sha256"
 
 echo -e "${GREEN}Backup verified and complete.${NC}"
+echo "Encryption: $([ "$ENCRYPT_BACKUP" = true ] && echo AES-256 || echo disabled)"
 echo "Archive: $BACKUP_PATH"
 echo "Checksum: $BACKUP_PATH.sha256"

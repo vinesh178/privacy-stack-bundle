@@ -40,12 +40,17 @@ apply_ipv4_rules() {
   while iptables -D INPUT -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_INPUT 2>/dev/null; do :; done
   iptables -I INPUT 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_INPUT
 
-  iptables -N PRIVACY_STACK_DOCKER 2>/dev/null || true
-  iptables -F PRIVACY_STACK_DOCKER
-  iptables -A PRIVACY_STACK_DOCKER -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-  iptables -A PRIVACY_STACK_DOCKER -j DROP
-  while iptables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_DOCKER 2>/dev/null; do :; done
-  iptables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_DOCKER
+  iptables -N PRIVACY_STACK_FORWARD 2>/dev/null || true
+  iptables -F PRIVACY_STACK_FORWARD
+  iptables -A PRIVACY_STACK_FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+  iptables -A PRIVACY_STACK_FORWARD -j DROP
+  while iptables -D FORWARD -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
+  iptables -I FORWARD 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
+
+  if iptables -L DOCKER-USER >/dev/null 2>&1; then
+    while iptables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
+    iptables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
+  fi
 }
 
 apply_ipv6_rules() {
@@ -63,13 +68,16 @@ apply_ipv6_rules() {
   while ip6tables -D INPUT -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_INPUT 2>/dev/null; do :; done
   ip6tables -I INPUT 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_INPUT
 
+  ip6tables -N PRIVACY_STACK_FORWARD 2>/dev/null || true
+  ip6tables -F PRIVACY_STACK_FORWARD
+  ip6tables -A PRIVACY_STACK_FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+  ip6tables -A PRIVACY_STACK_FORWARD -j DROP
+  while ip6tables -D FORWARD -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
+  ip6tables -I FORWARD 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
+
   if ip6tables -L DOCKER-USER >/dev/null 2>&1; then
-    ip6tables -N PRIVACY_STACK_DOCKER 2>/dev/null || true
-    ip6tables -F PRIVACY_STACK_DOCKER
-    ip6tables -A PRIVACY_STACK_DOCKER -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-    ip6tables -A PRIVACY_STACK_DOCKER -j DROP
-    while ip6tables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_DOCKER 2>/dev/null; do :; done
-    ip6tables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_DOCKER
+    while ip6tables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
+    ip6tables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
   fi
 }
 
@@ -82,8 +90,9 @@ SCRIPT_PATH=$(readlink -f "$0")
 cat > /etc/systemd/system/privacy-stack-onboarding-firewall.service <<EOF
 [Unit]
 Description=Protect Privacy Stack during onboarding
-After=docker.service network-online.target
-Wants=docker.service network-online.target
+After=network-online.target
+Before=docker.service
+Wants=network-online.target
 
 [Service]
 Type=oneshot
@@ -96,5 +105,6 @@ EOF
 
 systemctl daemon-reload
 systemctl enable privacy-stack-onboarding-firewall.service >/dev/null
+systemctl disable privacy-stack-vpn-lockdown.service >/dev/null 2>&1 || true
 
 echo "Onboarding firewall active: public SSH allowed; application ingress blocked."

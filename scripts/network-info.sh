@@ -7,10 +7,9 @@ ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT_DIR"
 
 if [ -f .env ]; then
-  set -a
   # shellcheck disable=SC1091
-  . ./.env
-  set +a
+  . scripts/lib/env.sh
+  load_privacy_env ./.env
 fi
 
 has_profile() {

@@ -33,9 +33,13 @@ jobs:
       - name: Go vulnerability scan
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
       - name: Compose and release policy
-        run: bash tests/release-policy.sh
+        run: |
+          bash tests/env-parser.sh
+          bash tests/release-policy.sh
       - name: Backup and restore round trip
-        run: bash tests/backup-restore-smoke.sh
+        run: |
+          bash tests/backup-restore-smoke.sh
+          bash tests/hot-backup-restore-smoke.sh
       - name: Secret scan
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:

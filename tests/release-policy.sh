@@ -11,7 +11,7 @@ fail() {
   exit 1
 }
 
-. configs/opinionated.env
+. configs/opinionated.conf
 
 [ "$PRIVACY_STACK_PROFILES" = "docs,media,dns,monitoring,dashboard,vpn" ] ||
   fail "opinionated profiles include a deferred or HTTPS-dependent service"
@@ -47,9 +47,22 @@ NODE
 grep -q 'chmod 600 .env credentials.txt' scripts/setup.sh ||
   fail "generated secret files are not both mode 600"
 
+dotenv_exec_pattern='^[[:space:]]*(sou''rce|\\.)[[:space:]]+.*\\.env([[:space:]]|$)'
+if rg -n "$dotenv_exec_pattern" \
+  --glob '*.sh' . >/dev/null; then
+  fail "a shell script executes dotenv content"
+fi
+
 onboarding_line=$(grep -n 'protect-onboarding.sh' scripts/setup.sh | head -1 | cut -d: -f1)
 compose_line=$(grep -n 'docker compose up -d' scripts/setup.sh | head -1 | cut -d: -f1)
 [ -n "$onboarding_line" ] && [ "$onboarding_line" -lt "$compose_line" ] ||
   fail "public ingress protection is not installed before containers start"
+
+for firewall_script in scripts/protect-onboarding.sh scripts/lockdown-vpn.sh; do
+  grep -q 'Before=docker.service' "$firewall_script" ||
+    fail "$firewall_script does not restore host firewall rules before Docker"
+  grep -q 'PRIVACY_STACK_FORWARD' "$firewall_script" ||
+    fail "$firewall_script does not fail closed for forwarded container traffic"
+done
 
 echo "Release security policy passed."

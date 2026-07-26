@@ -12,11 +12,19 @@ NC='\033[0m'
 INSTALL_DIR="${INSTALL_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 BACKUP_FILE=""
 ASSUME_YES=false
+ALLOW_NO_CHECKSUM=false
+PASSPHRASE_FILE=""
 TEMP_DIR=""
 
 for arg in "$@"; do
   case "$arg" in
     --yes) ASSUME_YES=true ;;
+    --allow-no-checksum) ALLOW_NO_CHECKSUM=true ;;
+    --passphrase-file)
+      echo "--passphrase-file requires a separate path argument." >&2
+      exit 1
+      ;;
+    --passphrase-file=*) PASSPHRASE_FILE=${arg#*=} ;;
     -*) echo "Unknown option: $arg" >&2; exit 1 ;;
     *) [ -z "$BACKUP_FILE" ] || { echo "Only one backup may be restored." >&2; exit 1; }
        BACKUP_FILE="$arg" ;;
@@ -27,6 +35,14 @@ if [ "$EUID" -ne 0 ] && [ "${PRIVACY_STACK_TESTING:-0}" != "1" ]; then
   echo -e "${RED}Run with sudo: sudo bash scripts/restore.sh BACKUP.tar.gz${NC}"
   exit 1
 fi
+
+OPERATION_LOCK="${PRIVACY_STACK_LOCK_FILE:-/var/lock/privacy-stack-operation.lock}"
+exec 9>"$OPERATION_LOCK"
+if ! flock -n 9; then
+  echo -e "${RED}Another Privacy Stack operation is already running.${NC}"
+  exit 1
+fi
+
 if [ -z "$BACKUP_FILE" ] || [ ! -f "$BACKUP_FILE" ]; then
   echo -e "${RED}Backup file not found: ${BACKUP_FILE:-<missing>}${NC}"
   exit 1
@@ -67,11 +83,39 @@ if [ -f "$BACKUP_FILE.sha256" ]; then
   echo "Verifying backup checksum..."
   (cd "$(dirname "$BACKUP_FILE")" && sha256sum -c "$(basename "$BACKUP_FILE").sha256")
 else
-  echo -e "${YELLOW}No checksum sidecar found; archive structure will still be validated.${NC}"
+  if [ "$ALLOW_NO_CHECKSUM" != true ]; then
+    echo -e "${RED}Checksum sidecar not found: $BACKUP_FILE.sha256${NC}"
+    echo "Use --allow-no-checksum only for a trusted archive whose checksum was lost."
+    exit 1
+  fi
+  echo -e "${YELLOW}Continuing without a checksum by explicit request.${NC}"
 fi
 
-validate_archive "$BACKUP_FILE"
-tar xzf "$BACKUP_FILE" -C "$TEMP_DIR"
+ARCHIVE_FILE="$BACKUP_FILE"
+case "$BACKUP_FILE" in
+  *.enc)
+    if [ -z "$PASSPHRASE_FILE" ]; then
+      PASSPHRASE_FILE="$TEMP_DIR/.passphrase"
+      read -r -s -p "Backup passphrase: " passphrase </dev/tty
+      echo
+      [ -n "$passphrase" ] ||
+        { echo -e "${RED}A passphrase is required.${NC}"; exit 1; }
+      printf '%s' "$passphrase" > "$PASSPHRASE_FILE"
+      unset passphrase
+    fi
+    [ -f "$PASSPHRASE_FILE" ] ||
+      { echo -e "${RED}Passphrase file not found.${NC}"; exit 1; }
+    ARCHIVE_FILE="$TEMP_DIR/decrypted-backup.tar.gz"
+    if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 \
+      -pass "file:$PASSPHRASE_FILE" -in "$BACKUP_FILE" -out "$ARCHIVE_FILE"; then
+      echo -e "${RED}Backup decryption failed.${NC}"
+      exit 1
+    fi
+    ;;
+esac
+
+validate_archive "$ARCHIVE_FILE"
+tar xzf "$ARCHIVE_FILE" -C "$TEMP_DIR"
 for nested_archive in "$TEMP_DIR"/data/*.tar.gz "$TEMP_DIR"/volumes/*.tar.gz; do
   [ -f "$nested_archive" ] && validate_archive "$nested_archive"
 done
@@ -84,6 +128,7 @@ fi
 
 BACKUP_MODE=$(sed -n 's/.*"backup_mode"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$MANIFEST")
 BACKUP_PROFILES=$(sed -n 's/.*"profiles"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$MANIFEST")
+BACKUP_DATA_DIR=$(sed -n 's/.*"data_dir"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$MANIFEST")
 if [ "$BACKUP_MODE" != "full" ] && [ "$BACKUP_MODE" != "hot" ]; then
   echo -e "${RED}Unsupported backup mode in manifest.${NC}"
   exit 1
@@ -166,13 +211,24 @@ if ! [[ "$PROJECT_NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]]; then
 fi
 [ "$PROFILES" = "$BACKUP_PROFILES" ] ||
   { echo -e "${RED}Manifest and .env profiles do not match.${NC}"; exit 1; }
+[ "$DATA_DIR" = "$BACKUP_DATA_DIR" ] ||
+  { echo -e "${RED}Manifest and .env data directories do not match.${NC}"; exit 1; }
+ALLOWED_DATA_ROOT="${PRIVACY_STACK_ALLOWED_DATA_ROOT:-/srv}"
 case "$DATA_DIR" in
-  ""|/|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/opt|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/var)
-    echo -e "${RED}Refusing unsafe DATA_DIR: $DATA_DIR${NC}"
-    exit 1 ;;
+  /*/../*|*/..|/*/./*|*/.) echo -e "${RED}Restore DATA_DIR contains unsafe path components.${NC}"; exit 1 ;;
+esac
+case "$DATA_DIR" in
+  "$ALLOWED_DATA_ROOT"/*) ;;
+  *) echo -e "${RED}Restore DATA_DIR must be below $ALLOWED_DATA_ROOT: $DATA_DIR${NC}"; exit 1 ;;
 esac
 
 mkdir -p "$DATA_DIR"/{media,paperless/consume,paperless/export}
+CANONICAL_DATA_DIR=$(cd "$DATA_DIR" && pwd -P)
+CANONICAL_ALLOWED_ROOT=$(cd "$ALLOWED_DATA_ROOT" && pwd -P)
+case "$CANONICAL_DATA_DIR" in
+  "$CANONICAL_ALLOWED_ROOT"/*) DATA_DIR="$CANONICAL_DATA_DIR" ;;
+  *) echo -e "${RED}Restore DATA_DIR resolves outside $CANONICAL_ALLOWED_ROOT.${NC}"; exit 1 ;;
+esac
 if [ -f "$TEMP_DIR/data/user-data.tar.gz" ]; then
   find "$DATA_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
   tar xzf "$TEMP_DIR/data/user-data.tar.gz" -C "$DATA_DIR"
@@ -195,6 +251,10 @@ done
 if [ "$BACKUP_MODE" = "hot" ] && [[ ",$PROFILES," == *",docs,"* ]]; then
   DUMP="$TEMP_DIR/volumes/paperless_db.dump"
   [ -s "$DUMP" ] || { echo -e "${RED}Hot backup is missing the Paperless database dump.${NC}"; exit 1; }
+  docker run --rm \
+    -v "${PROJECT_NAME}_paperless_pgdata:/data" \
+    alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce \
+    sh -eu -c 'find /data -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +'
   docker compose up -d paperless-db
   for _ in $(seq 1 30); do
     docker exec paperless_db pg_isready --username postgres --dbname paperless >/dev/null 2>&1 && break

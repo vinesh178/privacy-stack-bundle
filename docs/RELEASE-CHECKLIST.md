@@ -7,7 +7,7 @@ A release candidate is a go only when every item below passes.
 - [ ] `go test -race ./...` and `go vet ./...` pass
 - [ ] Govulncheck reports no reachable vulnerabilities
 - [ ] Full Compose configuration renders with every image pinned by digest
-- [ ] Backup/restore destructive round trip passes in its isolated test project
+- [ ] Encrypted full and hot backup/restore round trips pass in isolated projects
 - [ ] GitHub secret scan passes
 - [ ] Fresh Ubuntu, Debian, or Amazon Linux install completes from `main`
 - [ ] Tailscale login fallback is visible and succeeds
