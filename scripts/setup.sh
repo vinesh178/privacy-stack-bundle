@@ -257,12 +257,12 @@ has_profile "dashboard"  && check_service "Homepage (Dashboard)" "http://localho
 echo ""
 echo "Containers running: $(docker ps -q | wc -l)"
 
-if [ $FAIL -eq 0 ]; then
+if [ $FAIL -eq 0 ] && [ "${DEFER_ACCESS_ONBOARDING:-0}" != "1" ]; then
   echo ""
   echo -e "${GREEN}============================================================${NC}"
   echo -e "${GREEN}Privacy Stack is ready!${NC}"
   echo -e "${GREEN}============================================================${NC}"
-else
+elif [ $FAIL -gt 0 ]; then
   echo ""
   echo -e "${YELLOW}============================================================${NC}"
   echo -e "${YELLOW}$FAIL service(s) not ready yet. They may need more time.${NC}"
@@ -275,48 +275,49 @@ fi
 echo ""
 bash scripts/configure-npm.sh
 
-echo ""
-echo "Your apps:"
-echo ""
-if [ -n "$DOMAIN" ]; then
-  echo "  Proxy Manager:  https://manage.${DOMAIN}"
-  has_profile "photos"     && echo "  Photos:         https://photos.${DOMAIN}"
-  has_profile "docs"       && echo "  Documents:      https://docs.${DOMAIN}"
-  has_profile "media"      && echo "  Media:          https://media.${DOMAIN}"
-  has_profile "dns"        && echo "  DNS & Ads:      https://dns.${DOMAIN}"
-  has_profile "passwords"  && echo "  Passwords:      https://vault.${DOMAIN}"
-  has_profile "monitoring" && echo "  Monitoring:     https://status.${DOMAIN}"
-  has_profile "dashboard"  && echo "  Dashboard:      https://home.${DOMAIN}"
-else
-  echo "  Proxy Manager (NPM):    http://$IP:81"
-  has_profile "photos"     && echo "  Photos (Immich):         http://$IP:2283"
-  has_profile "docs"       && echo "  Documents (Paperless):   http://$IP:8000"
-  has_profile "media"      && echo "  Media (Jellyfin):        http://$IP:8096"
-  has_profile "dns"        && echo "  DNS & Ads (AdGuard):     http://$IP:3000"
-  has_profile "passwords"  && echo "  Passwords (Vaultwarden): http://$IP:8080"
-  has_profile "monitoring" && echo "  Monitoring (Uptime):     http://$IP:3001"
-  has_profile "dashboard"  && echo "  Dashboard (Homepage):    http://$IP:3002"
-fi
-
-echo ""
-if [ -f credentials.txt ]; then
-  echo "All credentials saved to: credentials.txt"
+if [ "${DEFER_ACCESS_ONBOARDING:-0}" != "1" ]; then
   echo ""
-fi
-
-if has_profile "vpn" && [ -z "${TAILSCALE_AUTHKEY}" ]; then
-  echo "Tailscale remote access:"
-  echo "  docker exec tailscale tailscale up"
+  echo "Your apps:"
   echo ""
-fi
+  if [ -n "$DOMAIN" ]; then
+    echo "  Proxy Manager:  https://manage.${DOMAIN}"
+    has_profile "photos"     && echo "  Photos:         https://photos.${DOMAIN}"
+    has_profile "docs"       && echo "  Documents:      https://docs.${DOMAIN}"
+    has_profile "media"      && echo "  Media:          https://media.${DOMAIN}"
+    has_profile "dns"        && echo "  DNS & Ads:      https://dns.${DOMAIN}"
+    has_profile "passwords"  && echo "  Passwords:      https://vault.${DOMAIN}"
+    has_profile "monitoring" && echo "  Monitoring:     https://status.${DOMAIN}"
+    has_profile "dashboard"  && echo "  Dashboard:      https://home.${DOMAIN}"
+  else
+    echo "  Proxy Manager (NPM):    http://$IP:81"
+    has_profile "photos"     && echo "  Photos (Immich):         http://$IP:2283"
+    has_profile "docs"       && echo "  Documents (Paperless):   http://$IP:8000"
+    has_profile "media"      && echo "  Media (Jellyfin):        http://$IP:8096"
+    has_profile "dns"        && echo "  DNS & Ads (AdGuard):     http://$IP:3000"
+    has_profile "passwords"  && echo "  Passwords (Vaultwarden): http://$IP:8080"
+    has_profile "monitoring" && echo "  Monitoring (Uptime):     http://$IP:3001"
+    has_profile "dashboard"  && echo "  Dashboard (Homepage):    http://$IP:3002"
+  fi
 
-echo "Backup your stack:  sudo bash scripts/backup.sh"
-echo "Restore from backup: sudo bash scripts/restore.sh /path/to/backup.tar.gz"
-echo "Health check:        bash scripts/test.sh"
-echo "============================================================"
-
-if [ "$FAIL" -gt 0 ]; then
   echo ""
-  echo "Some applications are still starting."
-  echo "The final health gate runs after Tailscale and AdGuard onboarding."
+  if [ -f credentials.txt ]; then
+    echo "All credentials saved to: credentials.txt"
+    echo ""
+  fi
+
+  if has_profile "vpn" && [ -z "${TAILSCALE_AUTHKEY}" ]; then
+    echo "Tailscale remote access:"
+    echo "  docker exec tailscale tailscale up"
+    echo ""
+  fi
+
+  echo "Backup your stack:  sudo bash scripts/backup.sh"
+  echo "Restore from backup: sudo bash scripts/restore.sh /path/to/backup.tar.gz"
+  echo "Health check:        bash scripts/test.sh"
+  echo "============================================================"
+
+  if [ "$FAIL" -gt 0 ]; then
+    echo ""
+    echo "Some applications are still starting."
+  fi
 fi

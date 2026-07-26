@@ -64,6 +64,20 @@ The setup displays a Tailscale login link. After login, it pauses for the
 AdGuard wizard, then asks you to verify SSH through the displayed Tailscale IP.
 Only after both checks does it disable public SSH and application ports.
 
+If the login command prints `EOF` or the IP check reports `NeedsLogin`, approve
+the `privacy-stack` device using the displayed URL, then check:
+
+```bash
+sudo docker exec tailscale tailscale ip -4
+```
+
+Success prints a `100.x.y.z` address. If the installer exited before detecting
+it, continue without recreating the stack:
+
+```bash
+sudo bash setup-server.sh --resume
+```
+
 ## 3. Confirm it worked
 
 When installation finishes, paste:

@@ -62,6 +62,35 @@ accidental remote lockout.
 
 See [EC2 quick start](docs/EC2-QUICKSTART.md) for AWS instructions.
 
+### If Tailscale remains at `NeedsLogin`
+
+The login page can report success just after the container command disconnects
+with `EOF`. The installer now waits up to five minutes for that browser approval.
+If the installer has already exited, verify the server from its SSH session:
+
+```bash
+sudo docker exec tailscale tailscale ip -4
+```
+
+If it still reports `NeedsLogin`, request a fresh device login:
+
+```bash
+sudo docker exec -it tailscale tailscale up --accept-dns=false
+```
+
+Open the displayed URL, approve the `privacy-stack` device, and run the IP check
+again. A successful connection prints a `100.x.y.z` address. Continue the
+interrupted installer without overwriting its configuration:
+
+```bash
+sudo bash /opt/privacy-stack/setup-server.sh --resume
+```
+
+Keep the original public SSH session open until VPN SSH and the final lockdown
+have both been confirmed. If you installed with `git clone` instead of the
+public bootstrap, run `sudo bash setup-server.sh --resume` from the cloned
+repository directory.
+
 ## AdGuard through Tailscale
 
 After installation:
