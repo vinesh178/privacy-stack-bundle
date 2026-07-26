@@ -207,7 +207,7 @@ services:
 
   # ============================================================
   # ADGUARD HOME — DNS server + ad/tracker blocking
-  # Access via NPM: dns.yourdomain.com → localhost:3000
+  # First-run wizard: host port 3000; permanent dashboard: host port 3003
   # DNS: point devices to YOUR_SERVER_IP as DNS server
   # ============================================================
   adguard:
@@ -219,6 +219,7 @@ services:
       - "53:53/tcp"
       - "53:53/udp"
       - "3000:3000"
+      - "3003:80"
     volumes:
       - adguard_work:/opt/adguardhome/work
       - adguard_conf:/opt/adguardhome/conf

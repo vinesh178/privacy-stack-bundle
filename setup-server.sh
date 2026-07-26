@@ -176,17 +176,31 @@ fi
 bash scripts/generate-homepage.sh
 docker compose up -d
 
+for _ in $(seq 1 30); do
+  if docker exec adguard test -f /opt/adguardhome/conf/AdGuardHome.yaml 2>/dev/null; then
+    break
+  fi
+  sleep 1
+done
+
 echo ""
 echo "Configure AdGuard before the final health check:"
-echo "  1. Open http://$TAILSCALE_IP:3000 on a device connected to Tailscale."
-echo "  2. Keep the admin interface on port 3000."
-echo "  3. Configure DNS on port 53."
-echo "  4. Return here and type ADGUARD."
-echo ""
-read -r -p "Type ADGUARD after its setup wizard is complete: " ADGUARD_CONFIRMATION </dev/tty
-if [ "$ADGUARD_CONFIRMATION" != "ADGUARD" ]; then
-  echo -e "${RED}AdGuard setup was not confirmed; public access has not been disabled.${NC}"
-  exit 1
+if docker exec adguard sh -c \
+  "grep -Eq '^[[:space:]]+address:[[:space:]]+[^[:space:]]*:80$' /opt/adguardhome/conf/AdGuardHome.yaml" \
+  2>/dev/null; then
+  echo "  Already configured: http://$TAILSCALE_IP:3003"
+else
+  echo "  1. Open http://$TAILSCALE_IP:3000 on a device connected to Tailscale."
+  echo "  2. Keep the admin interface on its default port 80."
+  echo "  3. Configure DNS on port 53."
+  echo "  4. After saving, use http://$TAILSCALE_IP:3003 for the dashboard."
+  echo "  5. Return here and type ADGUARD."
+  echo ""
+  read -r -p "Type ADGUARD after its setup wizard is complete: " ADGUARD_CONFIRMATION </dev/tty
+  if [ "$ADGUARD_CONFIRMATION" != "ADGUARD" ]; then
+    echo -e "${RED}AdGuard setup was not confirmed; public access has not been disabled.${NC}"
+    exit 1
+  fi
 fi
 
 bash scripts/test.sh
@@ -217,6 +231,8 @@ echo "Connect to this server through Tailscale:"
 echo "  ssh $SSH_USER@$TAILSCALE_IP"
 echo "If your EC2 private key is not loaded in your SSH agent:"
 echo "  ssh -i /path/to/private-key.pem $SSH_USER@$TAILSCALE_IP"
+echo "Show all network addresses and monitoring targets:"
+echo "  sudo bash $ROOT_DIR/scripts/network-info.sh"
 echo ""
 echo "Finish Uptime Kuma:"
 echo "  1. Open http://$TAILSCALE_IP:3001 and create its admin account."
@@ -226,3 +242,4 @@ echo "     Jellyfin       http://jellyfin:8096"
 echo "     Vaultwarden    http://vaultwarden:80"
 echo "     Homepage       http://homepage:3000"
 echo "     Proxy Manager  http://nginx-proxy-manager:81"
+echo "     AdGuard        http://adguard:80"

@@ -28,7 +28,7 @@
         description: Ad blocking + DNS
         widget:
           type: adguard
-          url: http://adguard:3000
+          url: http://adguard:80
     - Monitoring:
         icon: uptime-kuma.png
         href: https://status.yourdomain.com

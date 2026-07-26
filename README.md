@@ -10,7 +10,7 @@ has been verified.
 |---|---|---:|
 | Paperless-ngx | Documents and OCR | 8000 |
 | Jellyfin | Media | 8096 |
-| AdGuard Home | Ad-blocking DNS | 53, 3000 |
+| AdGuard Home | Ad-blocking DNS | 53, 3003 |
 | Vaultwarden | Password manager | 8080 |
 | Uptime Kuma | Monitoring | 3001 |
 | Homepage | Dashboard | 3002 |
@@ -63,6 +63,17 @@ See [EC2 quick start](docs/EC2-QUICKSTART.md) for AWS instructions and
 [Troubleshooting](docs/TROUBLESHOOTING.md) for the recovery commands validated
 on a fresh EC2 installation.
 
+### Show every network address
+
+After setup, print the server's Tailscale addresses, tailnet devices, SSH
+command, application URLs, Nginx Proxy Manager targets, AdGuard DNS address,
+and Uptime Kuma monitor URLs in one place:
+
+```bash
+cd /opt/privacy-stack
+sudo bash scripts/network-info.sh
+```
+
 ### If Tailscale remains at `NeedsLogin`
 
 The login page can report success just after the container command disconnects
@@ -96,12 +107,13 @@ repository directory.
 
 After installation:
 
-1. Open `http://TAILSCALE-IP:3000`.
-2. Complete the AdGuard wizard, keeping its admin interface on port `3000` and
-   DNS on port `53`.
-3. In the Tailscale admin console, add the VPS Tailscale IP as a global
+1. Open the first-run wizard at `http://TAILSCALE-IP:3000`.
+2. Complete the wizard, keeping its admin interface on port `80` and DNS on
+   port `53`.
+3. After setup, use `http://TAILSCALE-IP:3003` for the permanent dashboard.
+4. In the Tailscale admin console, add the VPS Tailscale IP as a global
    nameserver.
-4. Enable **Override DNS servers**.
+5. Enable **Override DNS servers**.
 
 Connected devices then use AdGuard over the encrypted tailnet on home, hotel,
 airport, or mobile networks. This filters DNS traffic; it does not make the VPS
@@ -130,7 +142,7 @@ on first use:
 | Vaultwarden | `http://vaultwarden:80` |
 | Homepage | `http://homepage:3000` |
 | Nginx Proxy Manager | `http://nginx-proxy-manager:81` |
-| AdGuard | `http://adguard:3000` |
+| AdGuard | `http://adguard:80` |
 
 These internal Docker addresses keep monitoring independent of the server's
 public and Tailscale addresses. Add AdGuard only after its first-run wizard is

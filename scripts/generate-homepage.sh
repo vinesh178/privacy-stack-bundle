@@ -87,11 +87,11 @@ YAML
     cat << YAML
     - DNS & Ads:
         icon: adguard-home.png
-        href: $(make_url dns 3000)
+        href: $(make_url dns 3003)
         description: Ad blocking + DNS
         widget:
           type: adguard
-          url: http://adguard:3000
+          url: http://adguard:80
 YAML
   fi
 

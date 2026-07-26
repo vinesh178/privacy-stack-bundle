@@ -100,12 +100,13 @@ If an application or monitor fails, follow the exact checks in
 
 ### Use AdGuard from any Wi-Fi
 
-1. Open `http://TAILSCALE-IP:3000`.
-2. Complete the AdGuard wizard. Keep the admin interface on port `3000`; run
-   DNS on port `53`.
-3. In the Tailscale admin console, open **DNS**.
-4. Add the VPS `100.x.y.z` Tailscale IP as a **global nameserver**.
-5. Enable **Override DNS servers**.
+1. Open the first-run wizard at `http://TAILSCALE-IP:3000`.
+2. Complete the wizard. Keep the admin interface on port `80`; run DNS on port
+   `53`.
+3. Open the permanent dashboard at `http://TAILSCALE-IP:3003`.
+4. In the Tailscale admin console, open **DNS**.
+5. Add the VPS `100.x.y.z` Tailscale IP as a **global nameserver**.
+6. Enable **Override DNS servers**.
 
 Every connected Tailscale device will then send DNS through the encrypted
 tailnet to AdGuard, including on hotel or airport Wi-Fi. This filters DNS only;
