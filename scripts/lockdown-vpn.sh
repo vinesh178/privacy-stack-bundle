@@ -42,18 +42,13 @@ case "$PUBLIC_INTERFACE" in
     exit 1
     ;;
 esac
-PUBLIC_INTERFACE_V6=$(
-  ip -6 route show default |
-    awk 'NR == 1 {for (i = 1; i <= NF; i++) if ($i == "dev") {print $(i + 1); exit}}'
+PUBLIC_INTERFACES_V6=()
+mapfile -t PUBLIC_INTERFACES_V6 < <(
+  ip -o -6 address show scope global |
+    awk '$2 != "lo" && $2 !~ /^tailscale/ && $2 != "docker0" &&
+      $2 !~ /^br-/ && $2 !~ /^veth/ {print $2}' |
+    sort -u
 )
-case "$PUBLIC_INTERFACE_V6" in
-  ""|lo|tailscale0|docker0|br-*)
-    [ -z "$PUBLIC_INTERFACE_V6" ] || {
-      echo "Refusing to treat $PUBLIC_INTERFACE_V6 as the public IPv6 interface."
-      exit 1
-    }
-    ;;
-esac
 
 # Install deterministic chains at position one. This avoids depending on
 # pre-existing firewall rule order and defaults to denying public ingress.
@@ -80,7 +75,7 @@ iptables -N DOCKER-USER 2>/dev/null || true
 while iptables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
 iptables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
 
-if [ -n "$PUBLIC_INTERFACE_V6" ]; then
+if [ "${#PUBLIC_INTERFACES_V6[@]}" -gt 0 ]; then
   if ! command -v ip6tables >/dev/null 2>&1 ||
     ! ip6tables -L INPUT >/dev/null 2>&1; then
     echo "Public IPv6 is present, but its firewall is unavailable; refusing to continue."
@@ -93,19 +88,25 @@ if [ -n "$PUBLIC_INTERFACE_V6" ]; then
   ip6tables -A PRIVACY_STACK_INPUT -p udp --sport 547 --dport 546 -j ACCEPT
   ip6tables -A PRIVACY_STACK_INPUT -p ipv6-icmp -j ACCEPT
   ip6tables -A PRIVACY_STACK_INPUT -j DROP
-  while ip6tables -D INPUT -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_INPUT 2>/dev/null; do :; done
-  ip6tables -I INPUT 1 -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_INPUT
+  for interface in "${PUBLIC_INTERFACES_V6[@]}"; do
+    while ip6tables -D INPUT -i "$interface" -j PRIVACY_STACK_INPUT 2>/dev/null; do :; done
+    ip6tables -I INPUT 1 -i "$interface" -j PRIVACY_STACK_INPUT
+  done
 
   ip6tables -N PRIVACY_STACK_FORWARD 2>/dev/null || true
   ip6tables -F PRIVACY_STACK_FORWARD
   ip6tables -A PRIVACY_STACK_FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
   ip6tables -A PRIVACY_STACK_FORWARD -j DROP
-  while ip6tables -D FORWARD -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
-  ip6tables -I FORWARD 1 -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_FORWARD
+  for interface in "${PUBLIC_INTERFACES_V6[@]}"; do
+    while ip6tables -D FORWARD -i "$interface" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
+    ip6tables -I FORWARD 1 -i "$interface" -j PRIVACY_STACK_FORWARD
+  done
 
   ip6tables -N DOCKER-USER 2>/dev/null || true
-  while ip6tables -D DOCKER-USER -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
-  ip6tables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_FORWARD
+  for interface in "${PUBLIC_INTERFACES_V6[@]}"; do
+    while ip6tables -D DOCKER-USER -i "$interface" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
+    ip6tables -I DOCKER-USER 1 -i "$interface" -j PRIVACY_STACK_FORWARD
+  done
 fi
 
 [ "$APPLY_ONLY" = true ] && exit 0
@@ -126,6 +127,7 @@ Restart=on-failure
 RestartSec=10
 
 [Install]
+RequiredBy=docker.service
 WantedBy=multi-user.target
 EOF
 

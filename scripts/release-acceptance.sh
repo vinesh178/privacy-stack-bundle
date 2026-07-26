@@ -51,9 +51,12 @@ PUBLIC_INTERFACE=$(
   ip route show default |
     awk 'NR == 1 {for (i = 1; i <= NF; i++) if ($i == "dev") {print $(i + 1); exit}}'
 )
-PUBLIC_INTERFACE_V6=$(
-  ip -6 route show default |
-    awk 'NR == 1 {for (i = 1; i <= NF; i++) if ($i == "dev") {print $(i + 1); exit}}'
+PUBLIC_INTERFACES_V6=()
+mapfile -t PUBLIC_INTERFACES_V6 < <(
+  ip -o -6 address show scope global |
+    awk '$2 != "lo" && $2 !~ /^tailscale/ && $2 != "docker0" &&
+      $2 !~ /^br-/ && $2 !~ /^veth/ {print $2}' |
+    sort -u
 )
 TAILSCALE_IP=$(docker exec tailscale tailscale ip -4 2>/dev/null | head -1 || true)
 EXPECTED_PROFILES="docs,media,dns,monitoring,dashboard,vpn"
@@ -102,6 +105,9 @@ check "VPN lockdown unit is enabled" \
   systemctl is-enabled --quiet privacy-stack-vpn-lockdown.service
 check "VPN lockdown unit ran successfully this boot" \
   systemctl is-active --quiet privacy-stack-vpn-lockdown.service
+check "Docker requires successful VPN lockdown at boot" \
+  sh -c "systemctl show docker.service --property=Requires --value |
+    tr ' ' '\n' | grep -qx privacy-stack-vpn-lockdown.service"
 if systemctl is-enabled --quiet privacy-stack-onboarding-firewall.service; then
   fail "temporary onboarding firewall is disabled"
 else
@@ -130,20 +136,21 @@ check "final public-input chain ends in DROP" \
 check "final public-forward chain ends in DROP" \
   sh -c "iptables -S PRIVACY_STACK_FORWARD | tail -1 | grep -qx -- '-A PRIVACY_STACK_FORWARD -j DROP'"
 
-if [ -n "$PUBLIC_INTERFACE_V6" ] &&
-  ip -6 address show dev "$PUBLIC_INTERFACE_V6" scope global |
-  grep -q 'inet6 '; then
+if [ "${#PUBLIC_INTERFACES_V6[@]}" -gt 0 ]; then
   echo ""
   echo "Public IPv6 firewall persistence:"
-  pass "public IPv6 interface detected as $PUBLIC_INTERFACE_V6"
-  check "IPv6 public INPUT enters the release-owned deny chain" \
-    ip6tables -C INPUT -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_INPUT
-  check "IPv6 public forwarding enters the release-owned deny chain" \
-    ip6tables -C FORWARD -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_FORWARD
-  check "IPv6 Docker forwarding enters the release-owned deny chain" \
-    ip6tables -C DOCKER-USER -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_FORWARD
+  for interface in "${PUBLIC_INTERFACES_V6[@]}"; do
+    pass "globally addressed IPv6 interface detected as $interface"
+    check "IPv6 public INPUT on $interface enters the release-owned deny chain" \
+      ip6tables -C INPUT -i "$interface" -j PRIVACY_STACK_INPUT
+    check "IPv6 public forwarding on $interface enters the release-owned deny chain" \
+      ip6tables -C FORWARD -i "$interface" -j PRIVACY_STACK_FORWARD
+    check "IPv6 Docker forwarding on $interface enters the release-owned deny chain" \
+      ip6tables -C DOCKER-USER -i "$interface" -j PRIVACY_STACK_FORWARD
+  done
   check "IPv6 Docker's first user rule is the release-owned deny chain" \
-    sh -c "ip6tables -S DOCKER-USER | grep '^-A DOCKER-USER ' | head -1 | grep -qx -- '-A DOCKER-USER -i $PUBLIC_INTERFACE_V6 -j PRIVACY_STACK_FORWARD'"
+    sh -c "ip6tables -S DOCKER-USER | grep '^-A DOCKER-USER ' | head -1 |
+      grep -q -- '-j PRIVACY_STACK_FORWARD$'"
   if ip6tables -C PRIVACY_STACK_INPUT -p tcp --dport 22 -j ACCEPT >/dev/null 2>&1; then
     fail "public IPv6 SSH is absent from the final allowlist"
   else
