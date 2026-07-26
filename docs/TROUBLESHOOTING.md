@@ -6,6 +6,13 @@ Run commands from the repository directory. Public bootstrap installations use:
 cd /opt/privacy-stack
 ```
 
+For a single read-only summary of all Tailscale addresses, peers, SSH and
+application URLs, Nginx targets, DNS details, and Kuma monitor URLs, run:
+
+```bash
+sudo bash scripts/network-info.sh
+```
+
 Keep the original public SSH session open until Tailscale SSH works from a
 second terminal.
 
@@ -89,7 +96,7 @@ Open `http://TAILSCALE-IP:3001`, create the account, then add HTTP(s) monitors:
 | Vaultwarden | `http://vaultwarden:80` |
 | Homepage | `http://homepage:3000` |
 | Nginx Proxy Manager | `http://nginx-proxy-manager:81` |
-| AdGuard | `http://adguard:3000` |
+| AdGuard | `http://adguard:80` |
 
 AdGuard should be added only after its first-run wizard is complete. Kuma checks
 again automatically at the configured heartbeat interval. Its current UI uses
@@ -105,7 +112,7 @@ const services = {
   Vaultwarden: 'http://vaultwarden:80',
   Homepage: 'http://homepage:3000',
   'Proxy Manager': 'http://nginx-proxy-manager:81',
-  AdGuard: 'http://adguard:3000'
+  AdGuard: 'http://adguard:80'
 };
 for (const [name, url] of Object.entries(services)) {
   fetch(url)

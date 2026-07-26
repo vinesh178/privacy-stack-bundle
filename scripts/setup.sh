@@ -254,7 +254,13 @@ check_service "Nginx Proxy Manager" "http://localhost:81"
 has_profile "photos"     && check_service "Immich (Photos)" "http://localhost:2283"
 has_profile "docs"       && check_service "Paperless (Documents)" "http://localhost:8000"
 has_profile "media"      && check_service "Jellyfin (Media)" "http://localhost:8096"
-has_profile "dns"        && check_service "AdGuard (DNS)" "http://localhost:3000"
+if has_profile "dns"; then
+  if curl -fsS --max-time 3 http://localhost:3003 >/dev/null 2>&1; then
+    check_service "AdGuard (DNS)" "http://localhost:3003"
+  else
+    check_service "AdGuard setup wizard" "http://localhost:3000"
+  fi
+fi
 has_profile "passwords"  && check_service "Vaultwarden (Passwords)" "http://localhost:8080"
 has_profile "monitoring" && check_service "Uptime Kuma (Monitoring)" "http://localhost:3001"
 has_profile "dashboard"  && check_service "Homepage (Dashboard)" "http://localhost:3002"
@@ -298,7 +304,7 @@ if [ "${DEFER_ACCESS_ONBOARDING:-0}" != "1" ]; then
     has_profile "photos"     && echo "  Photos (Immich):         http://$IP:2283"
     has_profile "docs"       && echo "  Documents (Paperless):   http://$IP:8000"
     has_profile "media"      && echo "  Media (Jellyfin):        http://$IP:8096"
-    has_profile "dns"        && echo "  DNS & Ads (AdGuard):     http://$IP:3000"
+    has_profile "dns"        && echo "  DNS & Ads (after setup): http://$IP:3003"
     has_profile "passwords"  && echo "  Passwords (Vaultwarden): http://$IP:8080"
     has_profile "monitoring" && echo "  Monitoring (Uptime):     http://$IP:3001"
     has_profile "dashboard"  && echo "  Dashboard (Homepage):    http://$IP:3002"

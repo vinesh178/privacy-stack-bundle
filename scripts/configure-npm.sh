@@ -178,7 +178,7 @@ PROXY_HOSTS=(
   "photos|photos|immich_server|2283"
   "docs|docs|paperless|8000"
   "media|media|jellyfin|8096"
-  "dns|dns|adguard|3000"
+  "dns|dns|adguard|80"
   "passwords|vault|vaultwarden|80"
   "monitoring|status|uptime_kuma|3001"
   "dashboard|home|homepage|3000"
