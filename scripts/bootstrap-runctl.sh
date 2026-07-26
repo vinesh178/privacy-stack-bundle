@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build and launch runctl on a fresh Ubuntu host.
+# Build and launch runctl on a fresh supported Linux host.
 
 set -euo pipefail
 

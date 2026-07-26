@@ -4,7 +4,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Project Overview
 
-Docker Compose-based self-hosting bundle that deploys one fixed privacy-focused service set on a VPS. The host configuration is Bash + Docker Compose + YAML. Tailscale is the only ingress after setup. An experimental Go CLI (`runctl`) is retained for the later catalog/plan MVP phase but is not the current public setup path. Target OS: Ubuntu 22.04/24.04 LTS.
+Docker Compose-based self-hosting bundle that deploys one fixed privacy-focused service set on a VPS. The host configuration is Bash + Docker Compose + YAML. Tailscale is the only ingress after setup. An experimental Go CLI (`runctl`) is retained for the later catalog/plan MVP phase but is not the current public setup path. Supported families are Ubuntu, Debian, and Amazon Linux with systemd.
 
 ## Commands
 

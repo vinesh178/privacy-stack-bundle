@@ -7,9 +7,11 @@ This path is designed for a first-time, non-technical tester with AWS credits.
 In the AWS EC2 console, choose **Launch instance** and use:
 
 - Name: `privacy-stack-test`
-- Image: Ubuntu Server 24.04 LTS
+- Image: a current **Canonical Ubuntu Server LTS**, x86_64
 - Architecture: 64-bit x86
-- Instance type: `m7i-flex.large` when Free Tier eligible, otherwise `t3.large`
+- Instance type: choose an x86 general-purpose type showing at least **8 GiB
+  memory** in your selected Region. `t3.large` is a common option, but instance
+  availability varies by Region and Availability Zone.
 - Storage: 60 GB gp3
 - Key pair: create or select an RSA `.pem` key
 - Security group: allow SSH from **My IP** only
@@ -25,6 +27,12 @@ ssh -i YOUR-KEY.pem ubuntu@PUBLIC-IP
 ```
 
 Replace `YOUR-KEY.pem` and `PUBLIC-IP` with the values from AWS.
+
+The installer checks capabilities rather than a hardcoded OS version. It
+supports current Ubuntu, Debian, and Amazon Linux releases with systemd. Do not
+rely on a specific EC2 family being present: AWS exposes different instance
+types in different Regions and Availability Zones, so use the memory
+requirement above.
 
 ## 2. Install
 

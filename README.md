@@ -1,6 +1,6 @@
 # Privacy Stack Bundle
 
-An opinionated self-hosted privacy stack for a fresh Ubuntu server. The setup
+An opinionated self-hosted privacy stack for a fresh Linux server. The setup
 installs one fixed service set and removes public ingress after Tailscale access
 has been verified.
 
@@ -23,7 +23,7 @@ Docker networks and are not published as product endpoints.
 
 ## Requirements
 
-- Fresh Ubuntu 22.04 or 24.04 server
+- Fresh Ubuntu, Debian, or Amazon Linux server with systemd
 - At least 8 GB RAM
 - At least 40 GB free disk space; 60 GB is recommended
 - A free Tailscale account
@@ -118,7 +118,7 @@ contain secrets and application data; store them securely.
 The repository also retains the experimental Go-based `runctl` catalog,
 planning, receipt, and status implementation. It is intentionally not the
 current setup path. Work on that MVP resumes after the fixed
-`setup-server.sh` flow passes fresh Ubuntu and EC2 validation.
+`setup-server.sh` flow passes fresh-server and EC2 validation.
 
 ## Network model
 

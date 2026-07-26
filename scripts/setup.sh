@@ -27,6 +27,7 @@ NC='\033[0m'
 INSTALL_DIR="${INSTALL_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$INSTALL_DIR"
 . configs/opinionated.env
+. scripts/lib/platform.sh
 
 echo ""
 echo "Privacy Stack — Automated Setup"
@@ -58,12 +59,12 @@ detect_ip() {
 # ---- 1. Install Docker ----
 if ! command -v docker &> /dev/null; then
   echo "Installing Docker..."
-  curl -fsSL https://get.docker.com | sh
-  usermod -aG docker "$REAL_USER"
-  echo -e "${GREEN}Docker installed${NC}"
 else
   echo -e "${GREEN}Docker already installed${NC}"
 fi
+platform_install_docker
+usermod -aG docker "$REAL_USER"
+echo -e "${GREEN}Docker and Compose are ready${NC}"
 
 # ---- 2. Generate fixed configuration ----
 if [ ! -f .env ] || grep -q "CHANGE_ME" .env 2>/dev/null; then
@@ -204,30 +205,8 @@ chown -R "$REAL_USER:$REAL_USER" "${DATA_DIR}"
 echo -e "${GREEN}Data directories created${NC}"
 
 # ---- 5. Firewall ----
-if command -v ufw &> /dev/null; then
-  echo "Configuring firewall..."
-  ufw allow 22/tcp   >/dev/null 2>&1  # SSH
-  ufw allow 41641/udp >/dev/null 2>&1 # Tailscale direct connections
-
-  if has_profile "vpn"; then
-    ufw allow in on tailscale0 >/dev/null 2>&1
-  else
-    ufw allow 80/tcp   >/dev/null 2>&1  # HTTP
-    ufw allow 443/tcp  >/dev/null 2>&1  # HTTPS
-    ufw allow 81/tcp   >/dev/null 2>&1  # NPM admin
-
-    has_profile "photos"     && ufw allow 2283/tcp >/dev/null 2>&1
-    has_profile "docs"       && ufw allow 8000/tcp >/dev/null 2>&1
-    has_profile "media"      && ufw allow 8096/tcp >/dev/null 2>&1
-    has_profile "dns"        && ufw allow 53/tcp >/dev/null 2>&1 && ufw allow 53/udp >/dev/null 2>&1 && ufw allow 3000/tcp >/dev/null 2>&1
-    has_profile "passwords"  && ufw allow 8080/tcp >/dev/null 2>&1
-    has_profile "monitoring" && ufw allow 3001/tcp >/dev/null 2>&1
-    has_profile "dashboard"  && ufw allow 3002/tcp >/dev/null 2>&1
-  fi
-
-  ufw --force enable >/dev/null 2>&1
-  echo -e "${GREEN}Firewall configured${NC}"
-fi
+# Public SSH remains available during onboarding. The verified VPN lockdown is
+# applied transactionally by scripts/lockdown-vpn.sh.
 
 # ---- 6. Generate homepage config ----
 if has_profile "dashboard"; then

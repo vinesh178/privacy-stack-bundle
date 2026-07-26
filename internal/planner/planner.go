@@ -99,7 +99,7 @@ func BuildInstallPlan(app catalog.Application, request InstallRequest) (Plan, er
 		Configuration:    sortedMap(values),
 		SecretReferences: sortedMap(secretReferences),
 		Operations: []Operation{
-			{Type: ValidateHost, Target: "Ubuntu 22.04/24.04 LTS"},
+			{Type: ValidateHost, Target: "Linux with systemd and apt, dnf, or yum"},
 			{Type: RunCuratedSetup, Target: app.Deployment.SetupScript},
 			{Type: VerifyHealth, Target: app.Deployment.PrimaryService},
 			{Type: RecordInstallation, Target: instanceID},

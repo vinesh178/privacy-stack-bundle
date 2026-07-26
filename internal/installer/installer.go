@@ -126,7 +126,7 @@ func validateMemory(minimumMB int) error {
 		return fmt.Errorf("inspect host memory: %w", err)
 	}
 	if totalKB/1024 < minimumMB {
-		return fmt.Errorf("this preset needs at least 8 GB RAM; choose m7i-flex.large or t3.large")
+		return fmt.Errorf("this preset needs at least 8 GB RAM; choose an available x86 general-purpose instance with at least 8 GiB memory")
 	}
 	return nil
 }

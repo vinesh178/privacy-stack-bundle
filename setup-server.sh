@@ -9,6 +9,7 @@ NC='\033[0m'
 
 ROOT_DIR=$(cd "$(dirname "$0")" && pwd)
 cd "$ROOT_DIR"
+. scripts/lib/platform.sh
 
 if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}Run this command with sudo:${NC}"
@@ -16,22 +17,17 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-if [ ! -f /etc/os-release ]; then
-  echo -e "${RED}Could not identify this server's operating system.${NC}"
+if ! platform_preflight; then
+  echo -e "${RED}This server does not provide the required Linux capabilities.${NC}"
   exit 1
 fi
 
-. /etc/os-release
-if [ "${ID:-}" != "ubuntu" ] || { [ "${VERSION_ID:-}" != "22.04" ] && [ "${VERSION_ID:-}" != "24.04" ]; }; then
-  echo -e "${RED}This setup requires Ubuntu 22.04 or Ubuntu 24.04.${NC}"
-  echo "Current system: ${PRETTY_NAME:-unknown}"
-  exit 1
-fi
+platform_install_prerequisites
 
 AVAILABLE_MEMORY_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
 if [ "${AVAILABLE_MEMORY_KB:-0}" -lt 7000000 ]; then
   echo -e "${RED}This setup requires at least 8 GB RAM.${NC}"
-  echo "On AWS, choose m7i-flex.large or t3.large."
+  echo "On AWS, choose any available x86 general-purpose instance with at least 8 GiB memory."
   exit 1
 fi
 

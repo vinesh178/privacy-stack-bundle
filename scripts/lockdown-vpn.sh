@@ -31,20 +31,45 @@ case "$PUBLIC_INTERFACE" in
     ;;
 esac
 
-# Docker-published ports bypass normal UFW input rules. Block traffic arriving
-# from the public interface at Docker's supported user firewall chain.
-if ! iptables -C DOCKER-USER -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null; then
-  iptables -I DOCKER-USER 1 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-fi
-if ! iptables -C DOCKER-USER -i "$PUBLIC_INTERFACE" -j DROP 2>/dev/null; then
-  iptables -I DOCKER-USER 2 -i "$PUBLIC_INTERFACE" -j DROP
-fi
+# Install deterministic chains at position one. This avoids depending on
+# pre-existing firewall rule order and defaults to denying public ingress.
+iptables -N PRIVACY_STACK_INPUT 2>/dev/null || true
+iptables -F PRIVACY_STACK_INPUT
+iptables -A PRIVACY_STACK_INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -A PRIVACY_STACK_INPUT -p udp --dport 41641 -j ACCEPT
+iptables -A PRIVACY_STACK_INPUT -p udp --sport 67 --dport 68 -j ACCEPT
+iptables -A PRIVACY_STACK_INPUT -p icmp -j ACCEPT
+iptables -A PRIVACY_STACK_INPUT -j DROP
+while iptables -D INPUT -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_INPUT 2>/dev/null; do :; done
+iptables -I INPUT 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_INPUT
 
-if command -v ufw >/dev/null 2>&1; then
-  ufw default deny incoming >/dev/null
-  ufw allow in on tailscale0 >/dev/null
-  ufw delete allow 22/tcp >/dev/null 2>&1 || true
-  ufw --force enable >/dev/null
+# Docker-published ports traverse DOCKER-USER rather than normal INPUT rules.
+iptables -N PRIVACY_STACK_DOCKER 2>/dev/null || true
+iptables -F PRIVACY_STACK_DOCKER
+iptables -A PRIVACY_STACK_DOCKER -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -A PRIVACY_STACK_DOCKER -j DROP
+while iptables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_DOCKER 2>/dev/null; do :; done
+iptables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_DOCKER
+
+if command -v ip6tables >/dev/null 2>&1; then
+  ip6tables -N PRIVACY_STACK_INPUT 2>/dev/null || true
+  ip6tables -F PRIVACY_STACK_INPUT
+  ip6tables -A PRIVACY_STACK_INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+  ip6tables -A PRIVACY_STACK_INPUT -p udp --dport 41641 -j ACCEPT
+  ip6tables -A PRIVACY_STACK_INPUT -p udp --sport 547 --dport 546 -j ACCEPT
+  ip6tables -A PRIVACY_STACK_INPUT -p ipv6-icmp -j ACCEPT
+  ip6tables -A PRIVACY_STACK_INPUT -j DROP
+  while ip6tables -D INPUT -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_INPUT 2>/dev/null; do :; done
+  ip6tables -I INPUT 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_INPUT
+
+  if ip6tables -L DOCKER-USER >/dev/null 2>&1; then
+    ip6tables -N PRIVACY_STACK_DOCKER 2>/dev/null || true
+    ip6tables -F PRIVACY_STACK_DOCKER
+    ip6tables -A PRIVACY_STACK_DOCKER -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+    ip6tables -A PRIVACY_STACK_DOCKER -j DROP
+    while ip6tables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_DOCKER 2>/dev/null; do :; done
+    ip6tables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_DOCKER
+  fi
 fi
 
 SCRIPT_PATH=$(readlink -f "$0")

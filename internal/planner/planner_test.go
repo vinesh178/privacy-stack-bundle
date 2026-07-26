@@ -56,7 +56,7 @@ func TestBuildInstallPlanProducesDeterministicIsolatedOperations(t *testing.T) {
 		t.Fatalf("InstanceID = %q, want immich-family-photos", first.InstanceID)
 	}
 	wantOperations := []planner.Operation{
-		{Type: planner.ValidateHost, Target: "Ubuntu 22.04/24.04 LTS"},
+		{Type: planner.ValidateHost, Target: "Linux with systemd and apt, dnf, or yum"},
 		{Type: planner.RunCuratedSetup, Target: "scripts/setup.sh"},
 		{Type: planner.VerifyHealth, Target: "server"},
 		{Type: planner.RecordInstallation, Target: "immich-family-photos"},

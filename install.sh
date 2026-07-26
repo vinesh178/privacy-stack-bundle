@@ -29,22 +29,25 @@ echo "Privacy Stack — One-Line Installer"
 echo "===================================="
 echo ""
 
-# Check OS
-if [ ! -f /etc/os-release ]; then
-  echo -e "${RED}This installer requires Ubuntu 22.04 or 24.04.${NC}"
-  exit 1
-fi
-. /etc/os-release
-if [ "${ID:-}" != "ubuntu" ] || { [ "${VERSION_ID:-}" != "22.04" ] && [ "${VERSION_ID:-}" != "24.04" ]; }; then
-  echo -e "${RED}This installer requires Ubuntu 22.04 or 24.04.${NC}"
-  echo "Current system: ${PRETTY_NAME:-unknown}"
+# Check platform capabilities needed to acquire the repository.
+if [ "$(uname -s)" != "Linux" ] || ! command -v systemctl >/dev/null 2>&1; then
+  echo -e "${RED}This installer requires a Linux server with systemd.${NC}"
   exit 1
 fi
 
 # Install git if missing
 if ! command -v git &> /dev/null; then
   echo "Installing git..."
-  apt-get update -qq && apt-get install -y -qq git > /dev/null
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update -qq && apt-get install -y -qq git >/dev/null
+  elif command -v dnf >/dev/null 2>&1; then
+    dnf install -y git >/dev/null
+  elif command -v yum >/dev/null 2>&1; then
+    yum install -y git >/dev/null
+  else
+    echo -e "${RED}No supported package manager found (apt, dnf, or yum).${NC}"
+    exit 1
+  fi
 fi
 
 # Clone or update
