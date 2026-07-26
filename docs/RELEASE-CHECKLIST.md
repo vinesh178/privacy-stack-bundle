@@ -19,3 +19,19 @@ A release candidate is a go only when every item below passes.
 The automated items run in `.github/workflows/ci.yml`. The fresh-server items
 remain a manual release gate because they validate cloud networking, systemd,
 Docker firewall behavior, and browser-based Tailscale approval.
+
+After the installer finishes, reboot the server. Reconnect through Tailscale
+and run the post-reboot server gate:
+
+```bash
+cd /opt/privacy-stack
+set -o pipefail
+sudo bash scripts/release-acceptance.sh | tee release-acceptance.txt
+```
+
+The script must report zero failures. It prints public-port probes to run from
+the tester's computer, including UDP DNS and IPv6 when the server has a public
+IPv6 address. Every public probe must fail or time out. Attach the redacted
+`release-acceptance.txt`, the external probe result, server OS, instance type,
+and tested public IP versions to the release ticket. The output intentionally
+excludes credentials, environment values, and Tailscale login URLs.

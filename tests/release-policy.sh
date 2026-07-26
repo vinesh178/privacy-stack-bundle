@@ -70,4 +70,16 @@ decrypt_detection_line=$(grep -n "head -c 24" scripts/restore.sh | head -1 | cut
 [ -n "$age_install_line" ] && [ "$age_install_line" -lt "$decrypt_detection_line" ] ||
   fail "fresh-server restore checks encrypted input before installing age"
 
+for invariant in \
+  'systemctl is-active --quiet privacy-stack-vpn-lockdown.service' \
+  'iptables -C DOCKER-USER' \
+  'ip6tables -C DOCKER-USER' \
+  'installed commit exactly matches origin/main' \
+  'git ls-files --others --exclude-standard' \
+  'dig @PUBLIC_IP example.com A' \
+  'AdGuard resolves DNS through Tailscale'; do
+  grep -Fq "$invariant" scripts/release-acceptance.sh ||
+    fail "post-reboot acceptance gate omits: $invariant"
+done
+
 echo "Release security policy passed."

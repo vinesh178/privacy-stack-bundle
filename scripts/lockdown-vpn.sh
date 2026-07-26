@@ -102,6 +102,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/bin/bash $SCRIPT_PATH --apply-only
+RemainAfterExit=yes
 Restart=on-failure
 RestartSec=10
 

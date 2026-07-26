@@ -61,6 +61,9 @@ See [EC2 quick start](docs/EC2-QUICKSTART.md) for AWS instructions and
 [Troubleshooting](docs/TROUBLESHOOTING.md) for the recovery commands validated
 on a fresh EC2 installation.
 
+Release maintainers should also run the post-reboot gate in
+[the release checklist](docs/RELEASE-CHECKLIST.md) before publishing a version.
+
 ### Show every network address
 
 After setup, print the server's Tailscale addresses, tailnet devices, SSH
