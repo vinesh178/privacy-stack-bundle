@@ -48,10 +48,9 @@ fi
 load_privacy_env .env
 
 PUBLIC_INTERFACE=$(ip route show default | awk 'NR==1 {print $5}')
+PUBLIC_INTERFACE_V6=$(ip -6 route show default | awk 'NR==1 {print $5}')
 TAILSCALE_IP=$(docker exec tailscale tailscale ip -4 2>/dev/null | head -1 || true)
 EXPECTED_PROFILES="docs,media,dns,monitoring,dashboard,vpn"
-LOCAL_HEAD=$(git rev-parse HEAD 2>/dev/null || true)
-ORIGIN_MAIN=$(git rev-parse refs/remotes/origin/main 2>/dev/null || true)
 
 echo "Privacy Stack release acceptance"
 echo "================================"
@@ -71,6 +70,13 @@ if git ls-files --others --exclude-standard | grep -q .; then
 else
   pass "repository has no unexpected untracked files"
 fi
+if git fetch --quiet origin main; then
+  pass "latest origin/main was fetched"
+else
+  fail "latest origin/main was fetched"
+fi
+LOCAL_HEAD=$(git rev-parse HEAD 2>/dev/null || true)
+ORIGIN_MAIN=$(git rev-parse refs/remotes/origin/main 2>/dev/null || true)
 if [ -n "$LOCAL_HEAD" ] &&
   [ -n "$ORIGIN_MAIN" ] &&
   [ "$LOCAL_HEAD" = "$ORIGIN_MAIN" ]; then
@@ -118,19 +124,20 @@ check "final public-input chain ends in DROP" \
 check "final public-forward chain ends in DROP" \
   sh -c "iptables -S PRIVACY_STACK_FORWARD | tail -1 | grep -qx -- '-A PRIVACY_STACK_FORWARD -j DROP'"
 
-if [ -n "$PUBLIC_INTERFACE" ] &&
-  ip -6 address show dev "$PUBLIC_INTERFACE" scope global |
+if [ -n "$PUBLIC_INTERFACE_V6" ] &&
+  ip -6 address show dev "$PUBLIC_INTERFACE_V6" scope global |
   grep -q 'inet6 '; then
   echo ""
   echo "Public IPv6 firewall persistence:"
+  pass "public IPv6 interface detected as $PUBLIC_INTERFACE_V6"
   check "IPv6 public INPUT enters the release-owned deny chain" \
-    ip6tables -C INPUT -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_INPUT
+    ip6tables -C INPUT -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_INPUT
   check "IPv6 public forwarding enters the release-owned deny chain" \
-    ip6tables -C FORWARD -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
+    ip6tables -C FORWARD -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_FORWARD
   check "IPv6 Docker forwarding enters the release-owned deny chain" \
-    ip6tables -C DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
+    ip6tables -C DOCKER-USER -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_FORWARD
   check "IPv6 Docker's first user rule is the release-owned deny chain" \
-    sh -c "ip6tables -S DOCKER-USER | grep '^-A DOCKER-USER ' | head -1 | grep -qx -- '-A DOCKER-USER -i $PUBLIC_INTERFACE -j PRIVACY_STACK_FORWARD'"
+    sh -c "ip6tables -S DOCKER-USER | grep '^-A DOCKER-USER ' | head -1 | grep -qx -- '-A DOCKER-USER -i $PUBLIC_INTERFACE_V6 -j PRIVACY_STACK_FORWARD'"
   if ip6tables -C PRIVACY_STACK_INPUT -p tcp --dport 22 -j ACCEPT >/dev/null 2>&1; then
     fail "public IPv6 SSH is absent from the final allowlist"
   else

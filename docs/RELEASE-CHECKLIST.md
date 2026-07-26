@@ -26,12 +26,14 @@ and run the post-reboot server gate:
 ```bash
 cd /opt/privacy-stack
 set -o pipefail
-sudo bash scripts/release-acceptance.sh | tee release-acceptance.txt
+sudo bash scripts/release-acceptance.sh |
+  tee "$HOME/privacy-stack-release-acceptance.txt"
 ```
 
 The script must report zero failures. It prints public-port probes to run from
 the tester's computer, including UDP DNS and IPv6 when the server has a public
 IPv6 address. Every public probe must fail or time out. Attach the redacted
-`release-acceptance.txt`, the external probe result, server OS, instance type,
-and tested public IP versions to the release ticket. The output intentionally
-excludes credentials, environment values, and Tailscale login URLs.
+`privacy-stack-release-acceptance.txt`, the external probe result, server OS,
+instance type, and tested public IP versions to the release ticket. The output
+intentionally excludes credentials, environment values, and Tailscale login
+URLs.

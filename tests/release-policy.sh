@@ -75,11 +75,17 @@ for invariant in \
   'iptables -C DOCKER-USER' \
   'ip6tables -C DOCKER-USER' \
   'installed commit exactly matches origin/main' \
+  'git fetch --quiet origin main' \
   'git ls-files --others --exclude-standard' \
   'dig @PUBLIC_IP example.com A' \
   'AdGuard resolves DNS through Tailscale'; do
   grep -Fq "$invariant" scripts/release-acceptance.sh ||
     fail "post-reboot acceptance gate omits: $invariant"
+done
+
+for firewall_script in scripts/protect-onboarding.sh scripts/lockdown-vpn.sh; do
+  grep -Fq 'PUBLIC_INTERFACE_V6=$(ip -6 route show default' "$firewall_script" ||
+    fail "$firewall_script does not resolve the IPv6 public interface independently"
 done
 
 echo "Release security policy passed."

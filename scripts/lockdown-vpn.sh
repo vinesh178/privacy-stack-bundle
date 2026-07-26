@@ -39,6 +39,15 @@ case "$PUBLIC_INTERFACE" in
     exit 1
     ;;
 esac
+PUBLIC_INTERFACE_V6=$(ip -6 route show default | awk 'NR==1 {print $5}')
+case "$PUBLIC_INTERFACE_V6" in
+  ""|lo|tailscale0|docker0|br-*)
+    [ -z "$PUBLIC_INTERFACE_V6" ] || {
+      echo "Refusing to treat $PUBLIC_INTERFACE_V6 as the public IPv6 interface."
+      exit 1
+    }
+    ;;
+esac
 
 # Install deterministic chains at position one. This avoids depending on
 # pre-existing firewall rule order and defaults to denying public ingress.
@@ -66,7 +75,8 @@ while iptables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>
 iptables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
 
 if command -v ip6tables >/dev/null 2>&1 &&
-  ip6tables -L INPUT >/dev/null 2>&1; then
+  ip6tables -L INPUT >/dev/null 2>&1 &&
+  [ -n "$PUBLIC_INTERFACE_V6" ]; then
   ip6tables -N PRIVACY_STACK_INPUT 2>/dev/null || true
   ip6tables -F PRIVACY_STACK_INPUT
   ip6tables -A PRIVACY_STACK_INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -74,19 +84,19 @@ if command -v ip6tables >/dev/null 2>&1 &&
   ip6tables -A PRIVACY_STACK_INPUT -p udp --sport 547 --dport 546 -j ACCEPT
   ip6tables -A PRIVACY_STACK_INPUT -p ipv6-icmp -j ACCEPT
   ip6tables -A PRIVACY_STACK_INPUT -j DROP
-  while ip6tables -D INPUT -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_INPUT 2>/dev/null; do :; done
-  ip6tables -I INPUT 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_INPUT
+  while ip6tables -D INPUT -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_INPUT 2>/dev/null; do :; done
+  ip6tables -I INPUT 1 -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_INPUT
 
   ip6tables -N PRIVACY_STACK_FORWARD 2>/dev/null || true
   ip6tables -F PRIVACY_STACK_FORWARD
   ip6tables -A PRIVACY_STACK_FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
   ip6tables -A PRIVACY_STACK_FORWARD -j DROP
-  while ip6tables -D FORWARD -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
-  ip6tables -I FORWARD 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
+  while ip6tables -D FORWARD -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
+  ip6tables -I FORWARD 1 -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_FORWARD
 
   ip6tables -N DOCKER-USER 2>/dev/null || true
-  while ip6tables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
-  ip6tables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
+  while ip6tables -D DOCKER-USER -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
+  ip6tables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE_V6" -j PRIVACY_STACK_FORWARD
 fi
 
 [ "$APPLY_ONLY" = true ] && exit 0
