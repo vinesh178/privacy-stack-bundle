@@ -52,13 +52,13 @@ platform_install_prerequisites() {
     apt)
       apt-get update -qq
       DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-        ca-certificates curl git iproute2 iptables openssl util-linux >/dev/null
+        ca-certificates coreutils curl git iproute2 iptables openssl util-linux >/dev/null
       ;;
     dnf)
-      dnf install -y ca-certificates curl git iproute iptables openssl util-linux >/dev/null
+      dnf install -y ca-certificates coreutils curl git iproute iptables openssl util-linux >/dev/null
       ;;
     yum)
-      yum install -y ca-certificates curl git iproute iptables openssl util-linux >/dev/null
+      yum install -y ca-certificates coreutils curl git iproute iptables openssl util-linux >/dev/null
       ;;
   esac
 }

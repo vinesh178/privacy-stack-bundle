@@ -140,8 +140,15 @@ echo "Connecting this server to Tailscale..."
 TAILSCALE_IP=$(get_tailscale_ip)
 if [ -z "$TAILSCALE_IP" ]; then
   echo "Open the login URL below and approve the privacy-stack device."
-  if ! docker exec -it tailscale tailscale up --accept-dns=false </dev/tty >/dev/tty 2>&1; then
-    echo -e "${YELLOW}The login command disconnected; waiting for browser approval...${NC}"
+  echo ""
+  echo "If no URL appears within 30 seconds:"
+  echo "  1. Keep this installer open."
+  echo "  2. Open a second SSH session."
+  echo "  3. Run: sudo docker exec tailscale tailscale up --accept-dns=false"
+  echo ""
+  if ! timeout 30 docker exec tailscale tailscale up --accept-dns=false; then
+    echo -e "${YELLOW}No completed login detected yet; waiting for browser approval...${NC}"
+    echo "If the URL was not shown, use the second-SSH command above."
   fi
   for _ in $(seq 1 60); do
     TAILSCALE_IP=$(get_tailscale_ip)
