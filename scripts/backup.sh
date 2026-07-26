@@ -63,6 +63,11 @@ PROJECT_NAME="${COMPOSE_PROJECT_NAME:-privacy-stack}"
 BACKUP_DIR="${BACKUP_DIR:-/srv/backups/privacy-stack}"
 DATA_DIR="${DATA_DIR:-/srv/privacy-stack}"
 ALLOWED_DATA_ROOT="${PRIVACY_STACK_ALLOWED_DATA_ROOT:-/srv}"
+if printf '%s%s%s' "$PROJECT_NAME" "$PROFILES" "$DATA_DIR" |
+  LC_ALL=C grep -q '[[:cntrl:]]'; then
+  echo -e "${RED}Backup metadata contains unsupported control characters.${NC}"
+  exit 1
+fi
 if ! [[ "$PROJECT_NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]]; then
   echo -e "${RED}Invalid Compose project name.${NC}"
   exit 1

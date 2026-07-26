@@ -65,4 +65,9 @@ for firewall_script in scripts/protect-onboarding.sh scripts/lockdown-vpn.sh; do
     fail "$firewall_script does not fail closed for forwarded container traffic"
 done
 
+age_install_line=$(grep -n 'platform_install_age' scripts/restore.sh | head -1 | cut -d: -f1)
+decrypt_detection_line=$(grep -n "head -c 24" scripts/restore.sh | head -1 | cut -d: -f1)
+[ -n "$age_install_line" ] && [ "$age_install_line" -lt "$decrypt_detection_line" ] ||
+  fail "fresh-server restore checks encrypted input before installing age"
+
 echo "Release security policy passed."

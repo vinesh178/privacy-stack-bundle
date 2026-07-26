@@ -96,6 +96,14 @@ else
   echo -e "${YELLOW}Continuing without a checksum by explicit request.${NC}"
 fi
 
+if [ "${PRIVACY_STACK_SKIP_HOST_SETUP:-0}" != "1" ]; then
+  cd "$INSTALL_DIR"
+  # shellcheck disable=SC1091
+  . scripts/lib/platform.sh
+  platform_install_prerequisites
+  platform_install_age
+fi
+
 ARCHIVE_FILE="$BACKUP_FILE"
 if head -c 24 "$BACKUP_FILE" | grep -q 'age-encryption.org/v1'; then
     command -v age >/dev/null 2>&1 &&
@@ -183,11 +191,7 @@ fi
 
 cd "$INSTALL_DIR"
 if [ "${PRIVACY_STACK_SKIP_HOST_SETUP:-0}" != "1" ]; then
-  # shellcheck disable=SC1091
-  . scripts/lib/platform.sh
-  platform_install_prerequisites
   platform_install_docker
-  platform_install_age
   bash scripts/protect-onboarding.sh
 fi
 
