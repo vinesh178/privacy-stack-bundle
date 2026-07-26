@@ -18,6 +18,6 @@ if eof_output=$(confirm_exact "LOCKDOWN" "Confirm: " </dev/null 2>&1); then
   echo "Confirmation unexpectedly accepted EOF." >&2
   exit 1
 fi
-grep -Fq "Confirmation input closed; no changes were made." <<< "$eof_output"
+grep -Fq "Confirmation input closed; confirmation was not accepted." <<< "$eof_output"
 
 echo "Confirmation prompt retry safety passed."

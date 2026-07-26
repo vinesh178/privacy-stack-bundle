@@ -9,7 +9,7 @@ confirm_exact() {
   while true; do
     if ! IFS= read -r -p "$prompt" response; then
       echo "" >&2
-      echo "Confirmation input closed; no changes were made." >&2
+      echo "Confirmation input closed; confirmation was not accepted." >&2
       return 1
     fi
 
