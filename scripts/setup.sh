@@ -2,12 +2,11 @@
 # ============================================================
 # Privacy Stack — Setup
 # Usage:
-#   sudo bash scripts/setup.sh                # Interactive (runs wizard)
-#   sudo bash scripts/setup.sh --non-interactive  # Use defaults, auto-generate everything
+#   sudo bash scripts/setup.sh
 #
 # Does EVERYTHING:
 #   1. Installs Docker
-#   2. Runs interactive wizard (or uses defaults)
+#   2. Generates the fixed configuration
 #   3. Generates secure passwords
 #   4. Fixes port 53 conflict
 #   5. Creates directories
@@ -17,7 +16,7 @@
 #   9. Runs health check
 # ============================================================
 
-set -e
+set -euo pipefail
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -25,16 +24,9 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# Parse arguments
-NON_INTERACTIVE=false
-for arg in "$@"; do
-  case "$arg" in
-    --non-interactive) NON_INTERACTIVE=true ;;
-  esac
-done
-
 INSTALL_DIR="${INSTALL_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$INSTALL_DIR"
+. configs/opinionated.env
 
 echo ""
 echo "Privacy Stack — Automated Setup"
@@ -73,10 +65,8 @@ else
   echo -e "${GREEN}Docker already installed${NC}"
 fi
 
-# ---- 2. Run wizard or auto-configure ----
-if [ "$NON_INTERACTIVE" = true ] || [ "${WIZARD_COMPLETED}" = "1" ]; then
-  # Non-interactive: generate .env with defaults if it doesn't exist or has placeholders
-  if [ ! -f .env ] || grep -q "CHANGE_ME" .env 2>/dev/null; then
+# ---- 2. Generate fixed configuration ----
+if [ ! -f .env ] || grep -q "CHANGE_ME" .env 2>/dev/null; then
     echo "Auto-generating configuration..."
 
     SERVER_IP="${SERVER_IP:-$(detect_ip)}"
@@ -87,7 +77,7 @@ if [ "$NON_INTERACTIVE" = true ] || [ "${WIZARD_COMPLETED}" = "1" ]; then
     VAULT_TOKEN=$(openssl rand -hex 24)
 
     DATA_DIR="${DATA_DIR:-/srv/privacy-stack}"
-    COMPOSE_PROFILES="${COMPOSE_PROFILES:-photos,docs,media,dns,passwords,monitoring,dashboard,vpn}"
+    COMPOSE_PROFILES="${COMPOSE_PROFILES:-$PRIVACY_STACK_PROFILES}"
     DOMAIN="${DOMAIN:-}"
     ACME_EMAIL="${ACME_EMAIL:-}"
     TAILSCALE_AUTHKEY="${TAILSCALE_AUTHKEY:-}"
@@ -175,12 +165,8 @@ EOF
     chmod 600 credentials.txt
 
     echo -e "${GREEN}Configuration generated${NC}"
-  else
-    echo -e "${GREEN}.env already configured${NC}"
-  fi
 else
-  # Interactive: run the wizard
-  source scripts/wizard.sh
+  echo -e "${GREEN}.env already configured${NC}"
 fi
 
 # ---- Source .env for the rest of setup ----
@@ -189,7 +175,7 @@ source .env
 set +a
 
 DATA_DIR="${DATA_DIR:-/srv/privacy-stack}"
-PROFILES="${COMPOSE_PROFILES:-photos,docs,media,dns,passwords,monitoring,dashboard,vpn}"
+PROFILES="${COMPOSE_PROFILES:-$PRIVACY_STACK_PROFILES}"
 
 has_profile() {
   [[ ",$PROFILES," == *",$1,"* ]]
@@ -221,17 +207,23 @@ echo -e "${GREEN}Data directories created${NC}"
 if command -v ufw &> /dev/null; then
   echo "Configuring firewall..."
   ufw allow 22/tcp   >/dev/null 2>&1  # SSH
-  ufw allow 80/tcp   >/dev/null 2>&1  # HTTP
-  ufw allow 443/tcp  >/dev/null 2>&1  # HTTPS
-  ufw allow 81/tcp   >/dev/null 2>&1  # NPM admin
+  ufw allow 41641/udp >/dev/null 2>&1 # Tailscale direct connections
 
-  has_profile "photos"     && ufw allow 2283/tcp >/dev/null 2>&1
-  has_profile "docs"       && ufw allow 8000/tcp >/dev/null 2>&1
-  has_profile "media"      && ufw allow 8096/tcp >/dev/null 2>&1
-  has_profile "dns"        && ufw allow 53/tcp >/dev/null 2>&1 && ufw allow 53/udp >/dev/null 2>&1 && ufw allow 3000/tcp >/dev/null 2>&1
-  has_profile "passwords"  && ufw allow 8080/tcp >/dev/null 2>&1
-  has_profile "monitoring" && ufw allow 3001/tcp >/dev/null 2>&1
-  has_profile "dashboard"  && ufw allow 3002/tcp >/dev/null 2>&1
+  if has_profile "vpn"; then
+    ufw allow in on tailscale0 >/dev/null 2>&1
+  else
+    ufw allow 80/tcp   >/dev/null 2>&1  # HTTP
+    ufw allow 443/tcp  >/dev/null 2>&1  # HTTPS
+    ufw allow 81/tcp   >/dev/null 2>&1  # NPM admin
+
+    has_profile "photos"     && ufw allow 2283/tcp >/dev/null 2>&1
+    has_profile "docs"       && ufw allow 8000/tcp >/dev/null 2>&1
+    has_profile "media"      && ufw allow 8096/tcp >/dev/null 2>&1
+    has_profile "dns"        && ufw allow 53/tcp >/dev/null 2>&1 && ufw allow 53/udp >/dev/null 2>&1 && ufw allow 3000/tcp >/dev/null 2>&1
+    has_profile "passwords"  && ufw allow 8080/tcp >/dev/null 2>&1
+    has_profile "monitoring" && ufw allow 3001/tcp >/dev/null 2>&1
+    has_profile "dashboard"  && ufw allow 3002/tcp >/dev/null 2>&1
+  fi
 
   ufw --force enable >/dev/null 2>&1
   echo -e "${GREEN}Firewall configured${NC}"
@@ -346,6 +338,6 @@ echo "============================================================"
 
 if [ "$FAIL" -gt 0 ]; then
   echo ""
-  echo "Running final health check..."
-  bash scripts/test.sh
+  echo "Some applications are still starting."
+  echo "The final health gate runs after Tailscale and AdGuard onboarding."
 fi

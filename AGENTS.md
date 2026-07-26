@@ -4,19 +4,23 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Project Overview
 
-Docker Compose-based self-hosting bundle that deploys privacy-focused services on a VPS. The host configuration remains Bash + Docker Compose + YAML. A small Go CLI (`runctl`) provides the MVP catalog, plan, install, and status experience. Target OS: Ubuntu 22.04/24.04 LTS.
+Docker Compose-based self-hosting bundle that deploys one fixed privacy-focused service set on a VPS. The host configuration is Bash + Docker Compose + YAML. Tailscale is the only ingress after setup. An experimental Go CLI (`runctl`) is retained for the later catalog/plan MVP phase but is not the current public setup path. Target OS: Ubuntu 22.04/24.04 LTS.
 
 ## Commands
 
 ```bash
-# One-line remote install (downloads repo + runs setup wizard)
+# One-line remote install (downloads repo + runs fixed setup)
 curl -sL <url>/install.sh | sudo bash
 
-# Interactive setup (wizard prompts for domain, services, etc.)
-sudo bash scripts/setup.sh
+# Opinionated fresh-server setup (fixed service list)
+sudo bash setup-server.sh
 
-# Non-interactive setup (auto-generates everything with defaults)
-sudo bash scripts/setup.sh --non-interactive
+# Experimental runctl MVP
+make build
+./bin/runctl catalog validate
+
+# Internal setup (auto-generates everything with fixed defaults)
+sudo bash scripts/setup.sh
 
 # Start/stop
 docker compose up -d
@@ -42,9 +46,12 @@ docker compose logs -f <service>   # e.g., immich-server, paperless, jellyfin
 ## Architecture
 
 - **docker-compose.yml** — Single compose file. Services use Docker Compose profiles for selective deployment. NPM (Nginx Proxy Manager) has no profile and always starts.
-- **install.sh** — Thin bootstrap for curl-pipe-bash install. Clones repo, hands off to setup.sh.
-- **scripts/setup.sh** — Main entrypoint. Installs Docker, runs wizard (or auto-configures with `--non-interactive`), generates passwords, creates dirs, configures firewall, generates homepage config, starts containers, runs health check.
-- **scripts/wizard.sh** — Interactive setup wizard sourced by setup.sh. Prompts for domain, email, data dir, service selection, Tailscale key. Writes .env and credentials.txt directly.
+- **install.sh** — Thin bootstrap for curl-pipe-bash install. Clones repo, hands off to setup-server.sh.
+- **setup-server.sh** — Canonical opinionated fresh-server entrypoint. Enforces Ubuntu/RAM/disk requirements and installs the fixed MVP service list.
+- **cmd/runctl/** and **internal/** — Experimental catalog/plan/install/status MVP retained for the next phase; do not route the opinionated setup through it yet.
+- **registry/** — Experimental application manifest used by `runctl`.
+- **scripts/setup.sh** — Internal setup engine. Installs Docker, generates passwords, creates dirs, configures firewall, generates homepage config, starts containers, and runs the health gate.
+- **scripts/lockdown-vpn.sh** — Removes public SSH and Docker ingress after verified Tailscale access, and installs a persistent systemd lockdown.
 - **scripts/generate-homepage.sh** — Regenerates `configs/homepage/services.yaml` based on enabled profiles and domain from .env.
 - **scripts/test.sh** — Profile-aware health check (containers, HTTP endpoints, DNS, Tailscale, resources).
 - **scripts/backup.sh** — Backs up Docker volumes, bind-mount data, and config. Supports `--hot` mode with pg_dump for no-downtime backups.
@@ -54,7 +61,7 @@ docker compose logs -f <service>   # e.g., immich-server, paperless, jellyfin
 
 ## Docker Compose Profiles
 
-Services are gated behind profiles so users can pick what they want. `COMPOSE_PROFILES` in `.env` controls what starts.
+Compose profiles remain an internal implementation detail. The public setup always starts the fixed profile set.
 
 | Profile | Services | Port(s) |
 |---------|----------|---------|
