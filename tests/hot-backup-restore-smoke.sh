@@ -4,9 +4,11 @@
 set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
+# shellcheck disable=SC1091
+. "$ROOT_DIR/tests/ensure-age.sh"
 TEST_DIR=$(mktemp -d)
 PROJECT_NAME="privacy-stack-hot-test-$$"
-BACKUP_FILE="$TEST_DIR/hot-roundtrip.tar.gz.enc"
+BACKUP_FILE="$TEST_DIR/hot-roundtrip.tar.gz.age"
 PASSPHRASE_FILE="$TEST_DIR/passphrase"
 POSTGRES_IMAGE="postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777"
 
@@ -65,7 +67,7 @@ done
 docker exec paperless_db psql -U postgres -d paperless -c \
   "CREATE TABLE release_probe(value text); INSERT INTO release_probe VALUES ('from-backup');"
 
-PRIVACY_STACK_TESTING=1 INSTALL_DIR="$TEST_DIR" \
+PRIVACY_STACK_TESTING=1 PRIVACY_STACK_ALLOWED_DATA_ROOT="$TEST_DIR" INSTALL_DIR="$TEST_DIR" \
   PRIVACY_STACK_LOCK_FILE="$TEST_DIR/operation.lock" \
   bash "$ROOT_DIR/scripts/backup.sh" --hot \
     --passphrase-file="$PASSPHRASE_FILE" "$BACKUP_FILE"

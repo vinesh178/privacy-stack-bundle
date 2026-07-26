@@ -120,3 +120,36 @@ platform_install_docker() {
     return 1
   fi
 }
+
+platform_install_age() {
+  local age_version="v1.3.1"
+  local age_arch age_sha256 archive temp_dir
+
+  if command -v age >/dev/null 2>&1 &&
+    command -v age-plugin-batchpass >/dev/null 2>&1; then
+    return 0
+  fi
+
+  case "$(uname -m)" in
+    x86_64)
+      age_arch=amd64
+      age_sha256="bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377"
+      ;;
+    aarch64|arm64)
+      age_arch=arm64
+      age_sha256="c6878a324421b69e3e20b00ba17c04bc5c6dab0030cfe55bf8f68fa8d9e9093a"
+      ;;
+    *) echo "Unsupported architecture for age: $(uname -m)" >&2; return 1 ;;
+  esac
+
+  temp_dir=$(mktemp -d)
+  archive="$temp_dir/age.tar.gz"
+  curl -fsSL \
+    "https://github.com/FiloSottile/age/releases/download/${age_version}/age-${age_version}-linux-${age_arch}.tar.gz" \
+    -o "$archive"
+  echo "$age_sha256  $archive" | sha256sum -c -
+  tar xzf "$archive" -C "$temp_dir"
+  install -m 0755 "$temp_dir/age/age" /usr/local/bin/age
+  install -m 0755 "$temp_dir/age/age-plugin-batchpass" /usr/local/bin/age-plugin-batchpass
+  rm -rf "$temp_dir"
+}

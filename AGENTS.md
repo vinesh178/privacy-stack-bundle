@@ -37,7 +37,7 @@ sudo bash scripts/backup.sh
 sudo bash scripts/backup.sh --hot
 
 # Restore (works on fresh server or existing)
-sudo bash scripts/restore.sh /path/to/backup.tar.gz.enc
+sudo bash scripts/restore.sh /path/to/backup.tar.gz.age
 
 # Logs
 docker compose logs -f <service>   # e.g., paperless, jellyfin

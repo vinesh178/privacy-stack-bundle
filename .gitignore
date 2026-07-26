@@ -1,5 +1,6 @@
 .env
 credentials.txt
+.test-bin/
 *.zip
 *.tar.gz
 .DS_Store

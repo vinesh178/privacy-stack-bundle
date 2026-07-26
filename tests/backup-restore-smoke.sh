@@ -4,10 +4,12 @@
 set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
+# shellcheck disable=SC1091
+. "$ROOT_DIR/tests/ensure-age.sh"
 TEST_DIR=$(mktemp -d)
 PROJECT_NAME="privacy-stack-test-$$"
 VOLUME_NAME="${PROJECT_NAME}_uptime_kuma_data"
-BACKUP_FILE="$TEST_DIR/roundtrip.tar.gz.enc"
+BACKUP_FILE="$TEST_DIR/roundtrip.tar.gz.age"
 PASSPHRASE_FILE="$TEST_DIR/passphrase"
 
 cleanup() {
@@ -46,7 +48,7 @@ docker run --rm -v "$VOLUME_NAME:/data" \
   alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce \
   sh -c 'printf release-roundtrip > /data/sentinel'
 
-PRIVACY_STACK_TESTING=1 INSTALL_DIR="$TEST_DIR" \
+PRIVACY_STACK_TESTING=1 PRIVACY_STACK_ALLOWED_DATA_ROOT="$TEST_DIR" INSTALL_DIR="$TEST_DIR" \
   PRIVACY_STACK_LOCK_FILE="$TEST_DIR/operation.lock" \
   bash "$ROOT_DIR/scripts/backup.sh" --passphrase-file="$PASSPHRASE_FILE" "$BACKUP_FILE"
 (cd "$TEST_DIR" && docker compose down --volumes)

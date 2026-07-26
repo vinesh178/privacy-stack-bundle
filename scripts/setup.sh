@@ -64,6 +64,7 @@ else
   echo -e "${GREEN}Docker already installed${NC}"
 fi
 platform_install_docker
+platform_install_age
 echo -e "${GREEN}Docker and Compose are ready${NC}"
 
 # Block public application ingress before any service starts. Public SSH stays
@@ -309,7 +310,7 @@ if [ "${DEFER_ACCESS_ONBOARDING:-0}" != "1" ]; then
   fi
 
   echo "Backup your stack:  sudo bash scripts/backup.sh"
-  echo "Restore from backup: sudo bash scripts/restore.sh /path/to/backup.tar.gz.enc"
+  echo "Restore from backup: sudo bash scripts/restore.sh /path/to/backup.tar.gz.age"
   echo "Health check:        bash scripts/test.sh"
   echo "============================================================"
 

@@ -183,13 +183,14 @@ sudo bash scripts/backup.sh
 sudo bash scripts/backup.sh --hot
 
 # Restore
-sudo bash scripts/restore.sh /path/to/backup.tar.gz.enc
+sudo bash scripts/restore.sh /path/to/backup.tar.gz.age
 ```
 
 Generated configuration, credentials, and data are ignored by Git. Backups may
 contain secrets and application data; store them securely.
 
-Backups are encrypted by default and prompt twice for a passphrase. Restore
+Backups use age's authenticated encryption by default and prompt twice for a
+passphrase. Restore
 prompts for the same passphrase and requires the adjacent `.sha256` checksum
 file. Store the passphrase separately from both files. For automation, provide
 a root-readable file with

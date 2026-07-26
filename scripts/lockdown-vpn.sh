@@ -61,10 +61,9 @@ iptables -A PRIVACY_STACK_FORWARD -j DROP
 while iptables -D FORWARD -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
 iptables -I FORWARD 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
 
-if iptables -L DOCKER-USER >/dev/null 2>&1; then
-  while iptables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
-  iptables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
-fi
+iptables -N DOCKER-USER 2>/dev/null || true
+while iptables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
+iptables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
 
 if command -v ip6tables >/dev/null 2>&1 &&
   ip6tables -L INPUT >/dev/null 2>&1; then
@@ -85,10 +84,9 @@ if command -v ip6tables >/dev/null 2>&1 &&
   while ip6tables -D FORWARD -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
   ip6tables -I FORWARD 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
 
-  if ip6tables -L DOCKER-USER >/dev/null 2>&1; then
-    while ip6tables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
-    ip6tables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
-  fi
+  ip6tables -N DOCKER-USER 2>/dev/null || true
+  while ip6tables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
+  ip6tables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
 fi
 
 [ "$APPLY_ONLY" = true ] && exit 0

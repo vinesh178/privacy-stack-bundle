@@ -38,9 +38,14 @@ if [ "$EUID" -ne 0 ] && [ "${PRIVACY_STACK_TESTING:-0}" != "1" ]; then
 fi
 
 OPERATION_LOCK="${PRIVACY_STACK_LOCK_FILE:-/var/lock/privacy-stack-operation.lock}"
-exec 9>"$OPERATION_LOCK"
-if ! flock -n 9; then
-  echo -e "${RED}Another Privacy Stack operation is already running.${NC}"
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$OPERATION_LOCK"
+  if ! flock -n 9; then
+    echo -e "${RED}Another Privacy Stack operation is already running.${NC}"
+    exit 1
+  fi
+elif [ "${PRIVACY_STACK_TESTING:-0}" != "1" ]; then
+  echo -e "${RED}flock is required to protect backup operations.${NC}"
   exit 1
 fi
 
@@ -56,10 +61,28 @@ load_privacy_env "$INSTALL_DIR/.env"
 PROFILES="${COMPOSE_PROFILES:-docs,media,dns,monitoring,dashboard,vpn}"
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-privacy-stack}"
 BACKUP_DIR="${BACKUP_DIR:-/srv/backups/privacy-stack}"
+DATA_DIR="${DATA_DIR:-/srv/privacy-stack}"
+ALLOWED_DATA_ROOT="${PRIVACY_STACK_ALLOWED_DATA_ROOT:-/srv}"
+if ! [[ "$PROJECT_NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]]; then
+  echo -e "${RED}Invalid Compose project name.${NC}"
+  exit 1
+fi
+for profile in ${PROFILES//,/ }; do
+  case "$profile" in
+    proxy|docs|media|dns|passwords|monitoring|dashboard|vpn) ;;
+    *) echo -e "${RED}Unsupported profile: $profile${NC}"; exit 1 ;;
+  esac
+done
+case "$DATA_DIR" in
+  "$ALLOWED_DATA_ROOT"/*) ;;
+  *) echo -e "${RED}DATA_DIR must be below $ALLOWED_DATA_ROOT: $DATA_DIR${NC}"; exit 1 ;;
+esac
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 if [ -z "$BACKUP_PATH" ]; then
   BACKUP_PATH="$BACKUP_DIR/privacy-stack-$TIMESTAMP.tar.gz"
-  [ "$ENCRYPT_BACKUP" = true ] && BACKUP_PATH="$BACKUP_PATH.enc"
+  [ "$ENCRYPT_BACKUP" = true ] && BACKUP_PATH="$BACKUP_PATH.age"
+elif [ "$ENCRYPT_BACKUP" = true ] && [[ "$BACKUP_PATH" != *.age ]]; then
+  BACKUP_PATH="$BACKUP_PATH.age"
 fi
 TEMP_DIR=$(mktemp -d)
 
@@ -143,7 +166,6 @@ for volume in $VOLUMES_TO_BACKUP; do
   echo "  $volume"
 done
 
-DATA_DIR="${DATA_DIR:-/srv/privacy-stack}"
 if [ -d "$DATA_DIR" ]; then
   tar czf "$TEMP_DIR/data/user-data.tar.gz" -C "$DATA_DIR" .
 fi
@@ -152,13 +174,19 @@ cp "$INSTALL_DIR/.env" "$TEMP_DIR/config/.env"
 cp -R "$INSTALL_DIR/configs" "$TEMP_DIR/config/configs"
 cp "$INSTALL_DIR/docker-compose.yml" "$TEMP_DIR/config/docker-compose.yml.reference"
 
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+MANIFEST_PROFILES=$(json_escape "$PROFILES")
+MANIFEST_PROJECT=$(json_escape "$PROJECT_NAME")
+MANIFEST_DATA_DIR=$(json_escape "$DATA_DIR")
 cat > "$TEMP_DIR/manifest.json" <<EOF
 {
   "schema_version": 2,
   "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "profiles": "$PROFILES",
-  "compose_project": "$PROJECT_NAME",
-  "data_dir": "$DATA_DIR",
+  "profiles": "$MANIFEST_PROFILES",
+  "compose_project": "$MANIFEST_PROJECT",
+  "data_dir": "$MANIFEST_DATA_DIR",
   "backup_mode": "$([ "$HOT_BACKUP" = true ] && echo hot || echo full)"
 }
 EOF
@@ -166,6 +194,9 @@ EOF
 PLAIN_ARCHIVE=$(mktemp)
 tar czf "$PLAIN_ARCHIVE" -C "$TEMP_DIR" .
 if [ "$ENCRYPT_BACKUP" = true ]; then
+  command -v age >/dev/null 2>&1 &&
+    command -v age-plugin-batchpass >/dev/null 2>&1 ||
+    { echo -e "${RED}age and age-plugin-batchpass are required.${NC}"; exit 1; }
   if [ -z "$PASSPHRASE_FILE" ]; then
     PASSPHRASE_FILE=$(mktemp)
     GENERATED_PASSPHRASE="$PASSPHRASE_FILE"
@@ -180,8 +211,8 @@ if [ "$ENCRYPT_BACKUP" = true ]; then
   fi
   [ -f "$PASSPHRASE_FILE" ] ||
     { echo -e "${RED}Passphrase file not found.${NC}"; exit 1; }
-  openssl enc -aes-256-cbc -salt -pbkdf2 -iter 600000 -md sha256 \
-    -pass "file:$PASSPHRASE_FILE" -in "$PLAIN_ARCHIVE" -out "$BACKUP_PATH"
+  AGE_PASSPHRASE_FD=3 age -e -j batchpass \
+    -o "$BACKUP_PATH" "$PLAIN_ARCHIVE" 3< "$PASSPHRASE_FILE"
 else
   cp "$PLAIN_ARCHIVE" "$BACKUP_PATH"
 fi
@@ -192,6 +223,6 @@ chmod 600 "$BACKUP_PATH"
 chmod 600 "$BACKUP_PATH.sha256"
 
 echo -e "${GREEN}Backup verified and complete.${NC}"
-echo "Encryption: $([ "$ENCRYPT_BACKUP" = true ] && echo AES-256 || echo disabled)"
+echo "Encryption: $([ "$ENCRYPT_BACKUP" = true ] && echo age-authenticated || echo disabled)"
 echo "Archive: $BACKUP_PATH"
 echo "Checksum: $BACKUP_PATH.sha256"

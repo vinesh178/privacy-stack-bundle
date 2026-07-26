@@ -47,10 +47,11 @@ apply_ipv4_rules() {
   while iptables -D FORWARD -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
   iptables -I FORWARD 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
 
-  if iptables -L DOCKER-USER >/dev/null 2>&1; then
-    while iptables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
-    iptables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
-  fi
+  # Pre-create this chain before Docker starts. Docker preserves it and routes
+  # container forwarding through it, so there is no publication race on boot.
+  iptables -N DOCKER-USER 2>/dev/null || true
+  while iptables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
+  iptables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
 }
 
 apply_ipv6_rules() {
@@ -75,10 +76,9 @@ apply_ipv6_rules() {
   while ip6tables -D FORWARD -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
   ip6tables -I FORWARD 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
 
-  if ip6tables -L DOCKER-USER >/dev/null 2>&1; then
-    while ip6tables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
-    ip6tables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
-  fi
+  ip6tables -N DOCKER-USER 2>/dev/null || true
+  while ip6tables -D DOCKER-USER -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD 2>/dev/null; do :; done
+  ip6tables -I DOCKER-USER 1 -i "$PUBLIC_INTERFACE" -j PRIVACY_STACK_FORWARD
 }
 
 apply_ipv4_rules

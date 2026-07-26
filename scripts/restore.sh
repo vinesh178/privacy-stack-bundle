@@ -37,9 +37,14 @@ if [ "$EUID" -ne 0 ] && [ "${PRIVACY_STACK_TESTING:-0}" != "1" ]; then
 fi
 
 OPERATION_LOCK="${PRIVACY_STACK_LOCK_FILE:-/var/lock/privacy-stack-operation.lock}"
-exec 9>"$OPERATION_LOCK"
-if ! flock -n 9; then
-  echo -e "${RED}Another Privacy Stack operation is already running.${NC}"
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$OPERATION_LOCK"
+  if ! flock -n 9; then
+    echo -e "${RED}Another Privacy Stack operation is already running.${NC}"
+    exit 1
+  fi
+elif [ "${PRIVACY_STACK_TESTING:-0}" != "1" ]; then
+  echo -e "${RED}flock is required to protect restore operations.${NC}"
   exit 1
 fi
 
@@ -92,8 +97,10 @@ else
 fi
 
 ARCHIVE_FILE="$BACKUP_FILE"
-case "$BACKUP_FILE" in
-  *.enc)
+if head -c 24 "$BACKUP_FILE" | grep -q 'age-encryption.org/v1'; then
+    command -v age >/dev/null 2>&1 &&
+      command -v age-plugin-batchpass >/dev/null 2>&1 ||
+      { echo -e "${RED}age and age-plugin-batchpass are required.${NC}"; exit 1; }
     if [ -z "$PASSPHRASE_FILE" ]; then
       PASSPHRASE_FILE="$TEMP_DIR/.passphrase"
       read -r -s -p "Backup passphrase: " passphrase </dev/tty
@@ -106,13 +113,12 @@ case "$BACKUP_FILE" in
     [ -f "$PASSPHRASE_FILE" ] ||
       { echo -e "${RED}Passphrase file not found.${NC}"; exit 1; }
     ARCHIVE_FILE="$TEMP_DIR/decrypted-backup.tar.gz"
-    if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -md sha256 \
-      -pass "file:$PASSPHRASE_FILE" -in "$BACKUP_FILE" -out "$ARCHIVE_FILE"; then
+    if ! AGE_PASSPHRASE_FD=3 age -d -j batchpass \
+      -o "$ARCHIVE_FILE" "$BACKUP_FILE" 3< "$PASSPHRASE_FILE"; then
       echo -e "${RED}Backup decryption failed.${NC}"
       exit 1
     fi
-    ;;
-esac
+fi
 
 validate_archive "$ARCHIVE_FILE"
 tar xzf "$ARCHIVE_FILE" -C "$TEMP_DIR"
@@ -181,6 +187,7 @@ if [ "${PRIVACY_STACK_SKIP_HOST_SETUP:-0}" != "1" ]; then
   . scripts/lib/platform.sh
   platform_install_prerequisites
   platform_install_docker
+  platform_install_age
   bash scripts/protect-onboarding.sh
 fi
 
