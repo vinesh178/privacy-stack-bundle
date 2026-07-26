@@ -1,0 +1,5 @@
+# Every change requires approval from the repository owner.
+* @vinesh178
+
+# Protect this policy file explicitly.
+/.github/CODEOWNERS @vinesh178
