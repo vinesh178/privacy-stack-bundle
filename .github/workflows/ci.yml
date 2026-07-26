@@ -1,0 +1,46 @@
+name: Release checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Bash syntax
+        run: bash -n install.sh setup-server.sh scripts/*.sh scripts/lib/*.sh tests/*.sh
+      - name: ShellCheck
+        run: |
+          docker run --rm -v "$PWD:/mnt:ro" \
+            koalaman/shellcheck:stable@sha256:bb596a0d169b85ddd81d8b6d3a2ff6d5baf5fca10b97f575ebc647c3dff62b3d \
+            --severity=warning install.sh setup-server.sh scripts/*.sh scripts/lib/*.sh tests/*.sh
+      - name: Go tests
+        run: go test -race ./...
+      - name: Go vet
+        run: go vet ./...
+      - name: Go vulnerability scan
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+      - name: Compose and release policy
+        run: |
+          bash tests/env-parser.sh
+          bash tests/release-policy.sh
+      - name: Backup and restore round trip
+        run: |
+          bash tests/backup-restore-smoke.sh
+          bash tests/hot-backup-restore-smoke.sh
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

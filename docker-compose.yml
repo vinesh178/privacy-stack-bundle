@@ -1,21 +1,19 @@
+name: ${COMPOSE_PROJECT_NAME:-privacy-stack}
+
 ##############################################################################
 # 🔒 The Complete Privacy Stack
-# One command. Eight self-hosted apps. Full data ownership.
+# One command. A focused self-hosted stack. Full data ownership.
 #
 # Usage:
 #   1. Copy .env.example to .env and fill in your values
 #   2. Run: docker compose up -d
-#   3. Access Nginx Proxy Manager at http://YOUR_IP:81
-#   4. Set up your domains/SSL in NPM
-#   5. Enjoy your privacy stack!
+#   3. Connect through Tailscale
+#   4. Open Homepage at http://YOUR_TAILSCALE_IP:3002
 #
 # Apps included:
-#   - Nginx Proxy Manager (reverse proxy + SSL)
-#   - Immich (Google Photos replacement)
 #   - Paperless-ngx (document management)
 #   - Jellyfin (Netflix replacement)
 #   - AdGuard Home (DNS + ad blocking)
-#   - Vaultwarden (Bitwarden-compatible password manager)
 #   - Uptime Kuma (monitoring)
 #   - Homepage (dashboard)
 #   - Tailscale (secure remote access)
@@ -24,7 +22,7 @@
 #   - Ubuntu 22.04/24.04 LTS
 #   - Docker + Docker Compose v2
 #   - Minimum 4GB RAM, 8GB recommended
-#   - 40GB+ disk (more for photos/media)
+#   - 40GB+ disk (more for media)
 ##############################################################################
 
 services:
@@ -35,9 +33,10 @@ services:
   # Default login: admin@example.com / changeme
   # ============================================================
   nginx-proxy-manager:
-    image: jc21/nginx-proxy-manager:latest
+    image: jc21/nginx-proxy-manager:latest@sha256:52b2c59994f3d36acfcf70a1626f29734df0ed8c71bacc0269f78b6f939858bb
     container_name: npm
     restart: unless-stopped
+    profiles: ["proxy"]
     ports:
       - "80:80"
       - "443:443"
@@ -49,70 +48,11 @@ services:
       - proxy
 
   # ============================================================
-  # IMMICH — Google Photos replacement
-  # Access via NPM: photos.yourdomain.com → localhost:2283
-  # ============================================================
-  immich-server:
-    image: ghcr.io/immich-app/immich-server:release
-    container_name: immich_server
-    restart: unless-stopped
-    profiles: ["photos"]
-    ports:
-      - "2283:2283"
-    volumes:
-      - ${UPLOAD_DIR:-./data/immich/upload}:/usr/src/app/upload
-      - /etc/localtime:/etc/localtime:ro
-    environment:
-      - DB_HOSTNAME=immich-postgres
-      - DB_USERNAME=${IMMICH_DB_USER:-postgres}
-      - DB_PASSWORD=${IMMICH_DB_PASSWORD}
-      - DB_DATABASE_NAME=${IMMICH_DB_NAME:-immich}
-      - REDIS_HOSTNAME=immich-redis
-    depends_on:
-      - immich-redis
-      - immich-postgres
-    networks:
-      - proxy
-      - immich
-
-  immich-machine-learning:
-    image: ghcr.io/immich-app/immich-machine-learning:release
-    container_name: immich_ml
-    restart: unless-stopped
-    profiles: ["photos"]
-    volumes:
-      - immich_ml_cache:/cache
-    networks:
-      - immich
-
-  immich-redis:
-    image: redis:7-alpine
-    container_name: immich_redis
-    restart: unless-stopped
-    profiles: ["photos"]
-    networks:
-      - immich
-
-  immich-postgres:
-    image: tensorchord/pgvecto-rs:pg16-v0.2.0
-    container_name: immich_postgres
-    restart: unless-stopped
-    profiles: ["photos"]
-    environment:
-      - POSTGRES_USER=${IMMICH_DB_USER:-postgres}
-      - POSTGRES_PASSWORD=${IMMICH_DB_PASSWORD}
-      - POSTGRES_DB=${IMMICH_DB_NAME:-immich}
-    volumes:
-      - immich_db:/var/lib/postgresql/data
-    networks:
-      - immich
-
-  # ============================================================
   # PAPERLESS-NGX — Document management + OCR
   # Access via NPM: docs.yourdomain.com → localhost:8000
   # ============================================================
   paperless:
-    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest@sha256:17312f00bac06f8dad09d67c6c8c069fc5c076c0c22313241c673102dfaf8ee9
     container_name: paperless
     restart: unless-stopped
     profiles: ["docs"]
@@ -145,7 +85,7 @@ services:
       - paperless
 
   paperless-db:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
     container_name: paperless_db
     restart: unless-stopped
     profiles: ["docs"]
@@ -158,7 +98,7 @@ services:
       - paperless
 
   paperless-redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
     container_name: paperless_redis
     restart: unless-stopped
     profiles: ["docs"]
@@ -166,7 +106,7 @@ services:
       - paperless
 
   paperless-gotenberg:
-    image: gotenberg/gotenberg:8
+    image: gotenberg/gotenberg:8@sha256:67097317623a503ba2a6a7e9ae8db6929a1f7e1bbd88077bacf2d325fbdab923
     container_name: paperless_gotenberg
     restart: unless-stopped
     profiles: ["docs"]
@@ -178,7 +118,7 @@ services:
       - paperless
 
   paperless-tika:
-    image: apache/tika:latest
+    image: apache/tika:latest@sha256:90b7fa1dc018434075fce9e1d9b88b1e3d0ea6979d0cf86e116c79a8073ae973
     container_name: paperless_tika
     restart: unless-stopped
     profiles: ["docs"]
@@ -190,7 +130,7 @@ services:
   # Access via NPM: media.yourdomain.com → localhost:8096
   # ============================================================
   jellyfin:
-    image: jellyfin/jellyfin:latest
+    image: jellyfin/jellyfin:latest@sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db
     container_name: jellyfin
     restart: unless-stopped
     profiles: ["media"]
@@ -211,7 +151,7 @@ services:
   # DNS: point devices to YOUR_SERVER_IP as DNS server
   # ============================================================
   adguard:
-    image: adguard/adguardhome:latest
+    image: adguard/adguardhome:latest@sha256:1ea34eafe5dc691007946e8eaab7bf46b0de9412f39213d8c06e48b53bf9a6c5
     container_name: adguard
     restart: unless-stopped
     profiles: ["dns"]
@@ -231,7 +171,7 @@ services:
   # Access via NPM: vault.yourdomain.com → localhost:8080
   # ============================================================
   vaultwarden:
-    image: vaultwarden/server:latest
+    image: vaultwarden/server:latest@sha256:e6443e3d5ed8fcee2204b89ec778d7f24d0173bcc42d1ea34f990304f5f63f51
     container_name: vaultwarden
     restart: unless-stopped
     profiles: ["passwords"]
@@ -242,7 +182,7 @@ services:
     environment:
       - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
       - DOMAIN=${VAULTWARDEN_URL:-https://vault.yourdomain.com}
-      - SIGNUPS_ALLOWED=${VAULTWARDEN_SIGNUPS:-true}
+      - SIGNUPS_ALLOWED=${VAULTWARDEN_SIGNUPS:-false}
     networks:
       - proxy
 
@@ -251,7 +191,7 @@ services:
   # Access via NPM: status.yourdomain.com → localhost:3001
   # ============================================================
   uptime-kuma:
-    image: louislam/uptime-kuma:latest
+    image: louislam/uptime-kuma:latest@sha256:3d632903e6af34139a37f18055c4f1bfd9b7205ae1138f1e5e8940ddc1d176f9
     container_name: uptime_kuma
     restart: unless-stopped
     profiles: ["monitoring"]
@@ -268,7 +208,7 @@ services:
   # Then access all services from anywhere via Tailscale IP
   # ============================================================
   tailscale:
-    image: tailscale/tailscale:latest
+    image: tailscale/tailscale:latest@sha256:f15d5d3f4a68773a853180b72496f70ba614b64de0878c43fe3da39fe0afba47
     container_name: tailscale
     restart: unless-stopped
     profiles: ["vpn"]
@@ -291,7 +231,7 @@ services:
   # Access via NPM: home.yourdomain.com → localhost:3002
   # ============================================================
   homepage:
-    image: ghcr.io/gethomepage/homepage:latest
+    image: ghcr.io/gethomepage/homepage:latest@sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28
     container_name: homepage
     restart: unless-stopped
     profiles: ["dashboard"]
@@ -299,7 +239,6 @@ services:
       - "3002:3000"
     volumes:
       - ./configs/homepage:/app/config
-      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - proxy
 
@@ -309,8 +248,6 @@ services:
 volumes:
   npm_data:
   npm_letsencrypt:
-  immich_db:
-  immich_ml_cache:
   paperless_data:
   paperless_media:
   paperless_pgdata:
@@ -328,7 +265,5 @@ volumes:
 networks:
   proxy:
     name: privacy-stack
-  immich:
-    internal: true
   paperless:
     internal: true

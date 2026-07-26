@@ -3,16 +3,16 @@ kind: Application
 metadata:
   id: privacy-stack
   name: Complete Privacy Stack
-  description: Eight curated self-hosted applications with automatic setup, credentials, backups, and health checks.
+  description: A focused self-hosted stack with automatic setup, credentials, backups, and health checks.
 release:
   version: 0.1.0
 deployment:
   compose: docker-compose.yml
-  primaryService: npm
+  primaryService: homepage
   setupScript: scripts/setup.sh
   ingress:
-    service: npm
-    port: 443
+    service: homepage
+    port: 3000
 configuration:
   - key: domain
     type: hostname
@@ -21,11 +21,11 @@ configuration:
   - key: profiles
     type: string
     required: false
-    default: photos,docs,media,dns,passwords,monitoring,dashboard,vpn
+    default: docs,media,dns,monitoring,dashboard,vpn
     env: COMPOSE_PROFILES
 presets:
   aws-credit:
     description: Full product validation on an 8 GB AWS credit-eligible instance.
     minimumRAMMB: 7000
     values:
-      profiles: photos,docs,media,passwords,monitoring,dashboard
+      profiles: docs,media,dns,monitoring,dashboard,vpn

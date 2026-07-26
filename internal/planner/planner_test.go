@@ -13,8 +13,8 @@ func TestBuildInstallPlanProducesDeterministicIsolatedOperations(t *testing.T) {
 		APIVersion: "install.run/v1",
 		Kind:       "Application",
 		Metadata: catalog.Metadata{
-			ID:   "immich",
-			Name: "Immich",
+			ID:   "paperless",
+			Name: "Paperless",
 		},
 		Release: catalog.Release{Version: "1.133.0"},
 		Deployment: catalog.Deployment{
@@ -23,7 +23,7 @@ func TestBuildInstallPlanProducesDeterministicIsolatedOperations(t *testing.T) {
 			SetupScript:    "scripts/setup.sh",
 			Ingress: catalog.Ingress{
 				Service: "server",
-				Port:    2283,
+				Port:    8000,
 			},
 		},
 		Configuration: []catalog.ConfigurationField{
@@ -33,9 +33,9 @@ func TestBuildInstallPlanProducesDeterministicIsolatedOperations(t *testing.T) {
 	}
 
 	input := planner.InstallRequest{
-		Instance: "family-photos",
+		Instance: "family-docs",
 		Values: map[string]string{
-			"domain":        "photos.example.com",
+			"domain":        "docs.example.com",
 			"adminPassword": "do-not-leak",
 		},
 	}
@@ -52,14 +52,14 @@ func TestBuildInstallPlanProducesDeterministicIsolatedOperations(t *testing.T) {
 	if !reflect.DeepEqual(first, second) {
 		t.Fatalf("plans differ:\nfirst: %#v\nsecond: %#v", first, second)
 	}
-	if first.InstanceID != "immich-family-photos" {
-		t.Fatalf("InstanceID = %q, want immich-family-photos", first.InstanceID)
+	if first.InstanceID != "paperless-family-docs" {
+		t.Fatalf("InstanceID = %q, want paperless-family-docs", first.InstanceID)
 	}
 	wantOperations := []planner.Operation{
 		{Type: planner.ValidateHost, Target: "Linux with systemd and apt, dnf, or yum"},
 		{Type: planner.RunCuratedSetup, Target: "scripts/setup.sh"},
 		{Type: planner.VerifyHealth, Target: "server"},
-		{Type: planner.RecordInstallation, Target: "immich-family-photos"},
+		{Type: planner.RecordInstallation, Target: "paperless-family-docs"},
 	}
 	if !reflect.DeepEqual(first.Operations, wantOperations) {
 		t.Fatalf("Operations = %#v, want %#v", first.Operations, wantOperations)

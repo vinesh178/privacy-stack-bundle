@@ -17,17 +17,18 @@
 # ============================================================
 
 set -euo pipefail
+umask 077
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
 NC='\033[0m'
 
 INSTALL_DIR="${INSTALL_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$INSTALL_DIR"
-. configs/opinionated.env
+. configs/opinionated.conf
 . scripts/lib/platform.sh
+. scripts/lib/env.sh
 
 echo ""
 echo "Privacy Stack — Automated Setup"
@@ -63,15 +64,18 @@ else
   echo -e "${GREEN}Docker already installed${NC}"
 fi
 platform_install_docker
-usermod -aG docker "$REAL_USER"
+platform_install_age
 echo -e "${GREEN}Docker and Compose are ready${NC}"
+
+# Block public application ingress before any service starts. Public SSH stays
+# available until the user verifies a second connection through Tailscale.
+bash scripts/protect-onboarding.sh
 
 # ---- 2. Generate fixed configuration ----
 if [ ! -f .env ] || grep -q "CHANGE_ME" .env 2>/dev/null; then
     echo "Auto-generating configuration..."
 
     SERVER_IP="${SERVER_IP:-$(detect_ip)}"
-    IMMICH_DB_PW=$(openssl rand -hex 16)
     PAPERLESS_DB_PW=$(openssl rand -hex 16)
     PAPERLESS_ADMIN_PW=$(openssl rand -base64 12 | tr -d '=/+' | head -c 16)
     PAPERLESS_SECRET=$(openssl rand -hex 32)
@@ -106,15 +110,9 @@ COMPOSE_PROFILES=${COMPOSE_PROFILES}
 
 # ---- DIRECTORIES ----
 DATA_DIR=${DATA_DIR}
-UPLOAD_DIR=${DATA_DIR}/immich/upload
 MEDIA_DIR=${DATA_DIR}/media
 PAPERLESS_CONSUME_DIR=${DATA_DIR}/paperless/consume
 PAPERLESS_EXPORT_DIR=${DATA_DIR}/paperless/export
-
-# ---- IMMICH (Photos) ----
-IMMICH_DB_USER=postgres
-IMMICH_DB_PASSWORD=${IMMICH_DB_PW}
-IMMICH_DB_NAME=immich
 
 # ---- PAPERLESS-NGX (Documents) ----
 PAPERLESS_DB_PASSWORD=${PAPERLESS_DB_PW}
@@ -130,7 +128,7 @@ JELLYFIN_URL=${JELLYFIN_URL}
 # ---- VAULTWARDEN (Passwords) ----
 VAULTWARDEN_ADMIN_TOKEN=${VAULT_TOKEN}
 VAULTWARDEN_URL=${VAULTWARDEN_URL}
-VAULTWARDEN_SIGNUPS=true
+VAULTWARDEN_SIGNUPS=false
 
 # ---- TAILSCALE (Remote Access) ----
 TAILSCALE_AUTHKEY=${TAILSCALE_AUTHKEY}
@@ -147,18 +145,10 @@ EOF
  Created: $(date -u +"%Y-%m-%d %H:%M UTC")
 ============================================
 
-Nginx Proxy Manager:
-  URL:      http://${SERVER_IP}:81
-  (password auto-changed during setup — see below)
-
 Paperless-ngx:
   URL:      http://${SERVER_IP}:8000
   Username: admin
   Password: ${PAPERLESS_ADMIN_PW}
-
-Vaultwarden:
-  URL:      http://${SERVER_IP}:8080
-  Admin Token: ${VAULT_TOKEN}
 
 Uptime Kuma:
   URL:      http://${SERVER_IP}:3001
@@ -168,7 +158,7 @@ Server IP: ${SERVER_IP}
 ============================================
 Keep this file safe and delete it after noting your credentials.
 EOF
-    chmod 600 credentials.txt
+    chmod 600 .env credentials.txt
 
     echo -e "${GREEN}Configuration generated${NC}"
 else
@@ -176,9 +166,7 @@ else
 fi
 
 # ---- Source .env for the rest of setup ----
-set -a
-source .env
-set +a
+load_privacy_env .env
 
 DATA_DIR="${DATA_DIR:-/srv/privacy-stack}"
 PROFILES="${COMPOSE_PROFILES:-$PRIVACY_STACK_PROFILES}"
@@ -204,7 +192,7 @@ fi
 
 # ---- 4. Create data directories ----
 echo "Creating data directories..."
-mkdir -p "${DATA_DIR}"/{immich/upload,media,paperless/consume,paperless/export}
+mkdir -p "${DATA_DIR}"/{media,paperless/consume,paperless/export}
 mkdir -p "${BACKUP_DIR:-/srv/backups/privacy-stack}"
 chown -R "$REAL_USER:$REAL_USER" "${DATA_DIR}"
 echo -e "${GREEN}Data directories created${NC}"
@@ -250,8 +238,7 @@ check_service() {
   fi
 }
 
-check_service "Nginx Proxy Manager" "http://localhost:81"
-has_profile "photos"     && check_service "Immich (Photos)" "http://localhost:2283"
+has_profile "proxy"      && check_service "Nginx Proxy Manager" "http://localhost:81"
 has_profile "docs"       && check_service "Paperless (Documents)" "http://localhost:8000"
 has_profile "media"      && check_service "Jellyfin (Media)" "http://localhost:8096"
 if has_profile "dns"; then
@@ -282,17 +269,18 @@ elif [ $FAIL -gt 0 ]; then
   sleep 90
 fi
 
-# ---- 9. Auto-configure Nginx Proxy Manager ----
-echo ""
-bash scripts/configure-npm.sh
+# ---- 9. Auto-configure Nginx Proxy Manager when explicitly enabled ----
+if has_profile "proxy"; then
+  echo ""
+  bash scripts/configure-npm.sh
+fi
 
 if [ "${DEFER_ACCESS_ONBOARDING:-0}" != "1" ]; then
   echo ""
   echo "Your apps:"
   echo ""
   if [ -n "$DOMAIN" ]; then
-    echo "  Proxy Manager:  https://manage.${DOMAIN}"
-    has_profile "photos"     && echo "  Photos:         https://photos.${DOMAIN}"
+    has_profile "proxy"      && echo "  Proxy Manager:  https://manage.${DOMAIN}"
     has_profile "docs"       && echo "  Documents:      https://docs.${DOMAIN}"
     has_profile "media"      && echo "  Media:          https://media.${DOMAIN}"
     has_profile "dns"        && echo "  DNS & Ads:      https://dns.${DOMAIN}"
@@ -300,8 +288,7 @@ if [ "${DEFER_ACCESS_ONBOARDING:-0}" != "1" ]; then
     has_profile "monitoring" && echo "  Monitoring:     https://status.${DOMAIN}"
     has_profile "dashboard"  && echo "  Dashboard:      https://home.${DOMAIN}"
   else
-    echo "  Proxy Manager (NPM):    http://$IP:81"
-    has_profile "photos"     && echo "  Photos (Immich):         http://$IP:2283"
+    has_profile "proxy"      && echo "  Proxy Manager (NPM):    http://$IP:81"
     has_profile "docs"       && echo "  Documents (Paperless):   http://$IP:8000"
     has_profile "media"      && echo "  Media (Jellyfin):        http://$IP:8096"
     has_profile "dns"        && echo "  DNS & Ads (after setup): http://$IP:3003"
@@ -323,7 +310,7 @@ if [ "${DEFER_ACCESS_ONBOARDING:-0}" != "1" ]; then
   fi
 
   echo "Backup your stack:  sudo bash scripts/backup.sh"
-  echo "Restore from backup: sudo bash scripts/restore.sh /path/to/backup.tar.gz"
+  echo "Restore from backup: sudo bash scripts/restore.sh /path/to/backup.tar.gz.age"
   echo "Health check:        bash scripts/test.sh"
   echo "============================================================"
 

@@ -11,6 +11,7 @@ NC='\033[0m'
 ROOT_DIR=$(cd "$(dirname "$0")" && pwd)
 cd "$ROOT_DIR"
 . scripts/lib/platform.sh
+. scripts/lib/env.sh
 
 SSH_USER="${SUDO_USER:-$(logname 2>/dev/null || true)}"
 if [ -z "$SSH_USER" ] || [ "$SSH_USER" = "root" ]; then
@@ -30,6 +31,13 @@ esac
 if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}Run this command with sudo:${NC}"
   echo "  sudo bash setup-server.sh"
+  exit 1
+fi
+
+OPERATION_LOCK="${PRIVACY_STACK_LOCK_FILE:-/var/lock/privacy-stack-operation.lock}"
+exec 9>"$OPERATION_LOCK"
+if ! flock -n 9; then
+  echo -e "${RED}Another Privacy Stack operation is already running.${NC}"
   exit 1
 fi
 
@@ -70,24 +78,30 @@ if [ "$RESUME" -ne 1 ]; then
 fi
 
 if [ "$RESUME" -eq 1 ]; then
-  set -a
-  # shellcheck disable=SC1091
-  . ./.env
-  set +a
+  load_privacy_env ./.env
 
-  if [[ ",${COMPOSE_PROFILES:-}," == *",photos,"* ]]; then
-    echo "Removing Immich from the opinionated stack (data volumes are preserved)..."
-    docker compose --profile photos rm --stop --force \
-      immich-server immich-machine-learning immich-redis immich-postgres
-    docker image rm \
-      ghcr.io/immich-app/immich-server:release \
-      ghcr.io/immich-app/immich-machine-learning:release \
-      tensorchord/pgvecto-rs:pg16-v0.2.0 >/dev/null 2>&1 || true
+  RETIRED_PROFILES=""
+
+  if [[ ",${COMPOSE_PROFILES:-}," == *",passwords,"* ]]; then
+    echo "Removing Vaultwarden from the HTTP-only MVP (data is preserved)..."
+    docker compose --profile passwords rm --stop --force vaultwarden
+    RETIRED_PROFILES="${RETIRED_PROFILES:+$RETIRED_PROFILES,}passwords"
+  fi
+
+  if [[ ",${COMPOSE_PROFILES:-}," == *",proxy,"* ]] ||
+    docker inspect npm >/dev/null 2>&1; then
+    echo "Removing Nginx Proxy Manager from the no-domain MVP (data is preserved)..."
+    docker compose --profile proxy rm --stop --force nginx-proxy-manager
+    RETIRED_PROFILES="${RETIRED_PROFILES:+$RETIRED_PROFILES,}proxy"
+  fi
+
+  if [ -n "$RETIRED_PROFILES" ]; then
     COMPOSE_PROFILES=$(awk -v profiles="$COMPOSE_PROFILES" 'BEGIN {
       count = split(profiles, profile, ",")
       separator = ""
       for (i = 1; i <= count; i++) {
-        if (profile[i] != "photos" && profile[i] != "") {
+        if (profile[i] != "passwords" &&
+            profile[i] != "proxy" && profile[i] != "") {
           printf "%s%s", separator, profile[i]
           separator = ","
         }
@@ -100,7 +114,7 @@ if [ "$RESUME" -eq 1 ]; then
   echo ""
   echo "Resuming Privacy Stack setup..."
 else
-  . configs/opinionated.env
+  . configs/opinionated.conf
   export COMPOSE_PROFILES="$PRIVACY_STACK_PROFILES"
 
   echo ""
@@ -111,10 +125,8 @@ else
   echo "  Documents   Paperless-ngx"
   echo "  Media       Jellyfin"
   echo "  DNS         AdGuard Home"
-  echo "  Passwords   Vaultwarden"
   echo "  Monitoring  Uptime Kuma"
   echo "  Dashboard   Homepage"
-  echo "  Proxy       Nginx Proxy Manager"
   echo "  VPN         Tailscale"
   echo ""
 
@@ -246,7 +258,5 @@ echo "  1. Open http://$TAILSCALE_IP:3001 and create its admin account."
 echo "  2. Add HTTP monitors for:"
 echo "     Paperless      http://paperless:8000"
 echo "     Jellyfin       http://jellyfin:8096"
-echo "     Vaultwarden    http://vaultwarden:80"
 echo "     Homepage       http://homepage:3000"
-echo "     Proxy Manager  http://nginx-proxy-manager:81"
 echo "     AdGuard        http://adguard:80"

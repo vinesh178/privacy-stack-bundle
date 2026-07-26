@@ -9,14 +9,14 @@ INSTALL_DIR="${INSTALL_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 
 # Source .env
 if [ -f "${INSTALL_DIR}/.env" ]; then
-  set -a
-  source "${INSTALL_DIR}/.env"
-  set +a
+  # shellcheck disable=SC1091
+  . "${INSTALL_DIR}/scripts/lib/env.sh"
+  load_privacy_env "${INSTALL_DIR}/.env"
 fi
 
 DOMAIN="${DOMAIN:-}"
 SERVER_IP="${SERVER_IP:-localhost}"
-PROFILES="${COMPOSE_PROFILES:-photos,docs,media,dns,passwords,monitoring,dashboard,vpn}"
+PROFILES="${COMPOSE_PROFILES:-docs,media,dns,monitoring,dashboard,vpn}"
 
 # Build URL for a service
 make_url() {
@@ -40,18 +40,6 @@ mkdir -p "$CONFIG_DIR"
 {
   echo "---"
   echo "- My Stack:"
-
-  if has_profile "photos"; then
-    cat << YAML
-    - Photos:
-        icon: immich.png
-        href: $(make_url photos 2283)
-        description: Google Photos replacement
-        widget:
-          type: immich
-          url: http://immich_server:2283
-YAML
-  fi
 
   if has_profile "docs"; then
     cat << YAML
@@ -107,12 +95,14 @@ YAML
 YAML
   fi
 
-  cat << YAML
+  if has_profile "proxy"; then
+    cat << YAML
     - Proxy Manager:
         icon: nginx-proxy-manager.png
         href: $(make_url manage 81)
         description: Reverse proxy + SSL
 YAML
+  fi
 
 } > "${CONFIG_DIR}/services.yaml"
 

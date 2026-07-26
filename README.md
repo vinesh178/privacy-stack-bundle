@@ -11,10 +11,8 @@ has been verified.
 | Paperless-ngx | Documents and OCR | 8000 |
 | Jellyfin | Media | 8096 |
 | AdGuard Home | Ad-blocking DNS | 53, 3003 |
-| Vaultwarden | Password manager | 8080 |
 | Uptime Kuma | Monitoring | 3001 |
 | Homepage | Dashboard | 3002 |
-| Nginx Proxy Manager | Reverse proxy | 81 |
 | Tailscale | Private network access | VPN |
 
 Databases, Redis, Tika, and other service dependencies are isolated on internal
@@ -66,7 +64,7 @@ on a fresh EC2 installation.
 ### Show every network address
 
 After setup, print the server's Tailscale addresses, tailnet devices, SSH
-command, application URLs, Nginx Proxy Manager targets, AdGuard DNS address,
+command, application URLs, optional reverse-proxy targets, AdGuard DNS address,
 and Uptime Kuma monitor URLs in one place:
 
 ```bash
@@ -150,9 +148,7 @@ on first use:
 |---|---|
 | Paperless | `http://paperless:8000` |
 | Jellyfin | `http://jellyfin:8096` |
-| Vaultwarden | `http://vaultwarden:80` |
 | Homepage | `http://homepage:3000` |
-| Nginx Proxy Manager | `http://nginx-proxy-manager:81` |
 | AdGuard | `http://adguard:80` |
 
 These internal Docker addresses keep monitoring independent of the server's
@@ -175,7 +171,8 @@ sudo docker compose ps
 # Logs
 sudo docker compose logs -f SERVICE
 
-# Update containers
+# Update to the release-pinned container versions
+sudo git pull --ff-only origin main
 sudo docker compose pull
 sudo docker compose up -d
 
@@ -186,11 +183,37 @@ sudo bash scripts/backup.sh
 sudo bash scripts/backup.sh --hot
 
 # Restore
-sudo bash scripts/restore.sh /path/to/backup.tar.gz
+sudo bash scripts/restore.sh /path/to/backup.tar.gz.age
 ```
 
 Generated configuration, credentials, and data are ignored by Git. Backups may
 contain secrets and application data; store them securely.
+
+Backups use age's authenticated encryption by default and prompt twice for a
+passphrase. Restore
+prompts for the same passphrase and requires the adjacent `.sha256` checksum
+file. Store the passphrase separately from both files. For automation, provide
+a root-readable file with
+`--passphrase-file=/secure/path/backup-passphrase`; the passphrase is never
+written into the archive or command output. `--unencrypted` exists only for
+explicit local testing.
+
+Nginx Proxy Manager (`proxy`) and Vaultwarden (`passwords`) remain optional
+Compose profiles for future domain-and-HTTPS testing. They are deliberately
+excluded from the fixed MVP: Vaultwarden's browser vault requires a secure
+HTTPS context, and the current release does not promise public-domain
+certificate automation.
+
+## Release security
+
+- Application ports are blocked on the public interface before containers
+  start; public SSH remains available only for onboarding.
+- Final lockdown occurs only after the user verifies SSH through Tailscale.
+- Generated `.env`, credentials, backup archives, and checksums use mode `600`.
+- Container images and bootstrap downloads are pinned and checksum-verified.
+- Homepage does not receive access to the Docker daemon socket.
+- Restore validates its checksum, archive paths, manifest version, project
+  name, profiles, and data directory before replacing data.
 
 ## Experimental next phase
 

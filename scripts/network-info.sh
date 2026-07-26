@@ -7,10 +7,9 @@ ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT_DIR"
 
 if [ -f .env ]; then
-  set -a
   # shellcheck disable=SC1091
-  . ./.env
-  set +a
+  . scripts/lib/env.sh
+  load_privacy_env ./.env
 fi
 
 has_profile() {
@@ -42,7 +41,7 @@ echo "  ssh $SSH_USER@$TAILSCALE_IPV4"
 echo "  ssh -i /path/to/private-key.pem $SSH_USER@$TAILSCALE_IPV4"
 echo ""
 echo "Application URLs:"
-echo "  Proxy Manager: http://$TAILSCALE_IPV4:81"
+has_profile "proxy"      && echo "  Proxy Manager: http://$TAILSCALE_IPV4:81"
 has_profile "docs"       && echo "  Paperless:     http://$TAILSCALE_IPV4:8000"
 has_profile "media"      && echo "  Jellyfin:      http://$TAILSCALE_IPV4:8096"
 has_profile "dns"        && echo "  AdGuard:       http://$TAILSCALE_IPV4:3003"
@@ -74,7 +73,7 @@ if has_profile "monitoring"; then
   has_profile "media"      && echo "  Jellyfin:      http://jellyfin:8096"
   has_profile "passwords"  && echo "  Vaultwarden:   http://vaultwarden:80"
   has_profile "dashboard"  && echo "  Homepage:      http://homepage:3000"
-  echo "  Proxy Manager: http://nginx-proxy-manager:81"
+  has_profile "proxy"      && echo "  Proxy Manager: http://nginx-proxy-manager:81"
   has_profile "dns"        && echo "  AdGuard:       http://adguard:80"
   echo ""
 fi
