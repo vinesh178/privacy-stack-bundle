@@ -59,7 +59,9 @@ Run the installer from an interactive SSH terminal. Tailscale authentication
 and the final `LOCKDOWN` confirmation use that terminal deliberately to prevent
 accidental remote lockout.
 
-See [EC2 quick start](docs/EC2-QUICKSTART.md) for AWS instructions.
+See [EC2 quick start](docs/EC2-QUICKSTART.md) for AWS instructions and
+[Troubleshooting](docs/TROUBLESHOOTING.md) for the recovery commands validated
+on a fresh EC2 installation.
 
 ### If Tailscale remains at `NeedsLogin`
 
@@ -128,10 +130,15 @@ on first use:
 | Vaultwarden | `http://vaultwarden:80` |
 | Homepage | `http://homepage:3000` |
 | Nginx Proxy Manager | `http://nginx-proxy-manager:81` |
+| AdGuard | `http://adguard:3000` |
 
 These internal Docker addresses keep monitoring independent of the server's
-public and Tailscale addresses. Configure AdGuard first; DNS monitoring can be
-added separately afterward.
+public and Tailscale addresses. Add AdGuard only after its first-run wizard is
+complete. Kuma checks again at the configured heartbeat interval; its current
+UI uses **Pause** and **Resume**, not a **Retry Now** action.
+
+See [Troubleshooting](docs/TROUBLESHOOTING.md#uptime-kuma-is-empty) for a single
+command that tests every monitor URL from inside the Kuma container.
 
 ## Operations
 
