@@ -33,11 +33,13 @@ For example, Uptime Kuma is `http://100.x.y.z:3001`.
 Request a device login:
 
 ```bash
-sudo docker exec -it tailscale tailscale up --accept-dns=false
+sudo docker exec tailscale tailscale up --accept-dns=false
 ```
 
 Open the displayed URL and approve the `privacy-stack` device. The browser
 account being logged in is not enough; the new device must also be approved.
+If the installer says it is connecting but shows no URL after 30 seconds, keep
+it running and execute the command above from a second SSH session.
 Verify the server received an address:
 
 ```bash

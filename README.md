@@ -74,10 +74,21 @@ cd /opt/privacy-stack
 sudo bash scripts/network-info.sh
 ```
 
+### If the Tailscale login URL does not appear
+
+Keep the installer open. In a second SSH session, run:
+
+```bash
+sudo docker exec tailscale tailscale up --accept-dns=false
+```
+
+Open the displayed URL and approve the `privacy-stack` device. The original
+installer then polls for the approved VPN address for up to five minutes.
+
 ### If Tailscale remains at `NeedsLogin`
 
 The login page can report success just after the container command disconnects
-with `EOF`. The installer now waits up to five minutes for that browser approval.
+with `EOF`. The installer then polls for up to five minutes for browser approval.
 If the installer has already exited, verify the server from its SSH session:
 
 ```bash
@@ -87,7 +98,7 @@ sudo docker exec tailscale tailscale ip -4
 If it still reports `NeedsLogin`, request a fresh device login:
 
 ```bash
-sudo docker exec -it tailscale tailscale up --accept-dns=false
+sudo docker exec tailscale tailscale up --accept-dns=false
 ```
 
 Open the displayed URL, approve the `privacy-stack` device, and run the IP check
