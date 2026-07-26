@@ -112,6 +112,27 @@ The VPS itself is configured with Tailscale DNS acceptance disabled so it does
 not feed its own resolver back into AdGuard when the tailnet-wide DNS override
 is enabled.
 
+## Uptime Kuma first run
+
+Uptime Kuma starts without monitors because its admin account must be created
+on first use:
+
+1. Open `http://TAILSCALE-IP:3001`.
+2. Create the Uptime Kuma admin account.
+3. Select **Add New Monitor**, choose **HTTP(s)**, and add:
+
+| Name | Internal URL |
+|---|---|
+| Paperless | `http://paperless:8000` |
+| Jellyfin | `http://jellyfin:8096` |
+| Vaultwarden | `http://vaultwarden:80` |
+| Homepage | `http://homepage:3000` |
+| Nginx Proxy Manager | `http://nginx-proxy-manager:81` |
+
+These internal Docker addresses keep monitoring independent of the server's
+public and Tailscale addresses. Configure AdGuard first; DNS monitoring can be
+added separately afterward.
+
 ## Operations
 
 ```bash

@@ -159,6 +159,10 @@ Vaultwarden:
   URL:      http://${SERVER_IP}:8080
   Admin Token: ${VAULT_TOKEN}
 
+Uptime Kuma:
+  URL:      http://${SERVER_IP}:3001
+  First run: create the admin account, then add the monitors listed in README.md.
+
 Server IP: ${SERVER_IP}
 ============================================
 Keep this file safe and delete it after noting your credentials.
