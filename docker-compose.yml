@@ -283,6 +283,7 @@ services:
       - TS_AUTHKEY=${TAILSCALE_AUTHKEY:-}
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=false
+      - TS_DEBUG_FIREWALL_MODE=auto
     network_mode: host
 
   # ============================================================
