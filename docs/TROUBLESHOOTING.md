@@ -55,6 +55,34 @@ If the installer is still stuck at `Connecting this server to Tailscale...` but
 the IP command already prints `100.x.y.z`, press **Ctrl-C** once and use the
 resume command above. Do not interrupt while firewall lockdown is running.
 
+## Tailscale health reports a missing iptables filter table
+
+On newer Linux kernels, the container's legacy iptables command may report:
+
+```text
+can't initialize iptables table `filter'
+```
+
+Current Compose configuration sets Tailscale's firewall mode to `auto`, allowing
+it to select nftables when legacy iptables is unavailable. Apply the update from
+an existing SSH session:
+
+```bash
+cd /opt/privacy-stack
+sudo git pull --ff-only origin main
+sudo docker compose up -d --no-deps --force-recreate tailscale
+sudo docker logs --tail=50 tailscale
+sudo docker logs tailscale 2>&1 | grep -E 'using (nftables|iptables)'
+sudo docker exec tailscale tailscale ip -4
+```
+
+On affected Ubuntu hosts, the firewall log should report `using nftables`. If
+the final command still prints a `100.x.y.z` address, the earlier health output
+was a firewall-backend warning rather than a disconnected VPN.
+
+Recreating this container briefly interrupts Tailscale. Keep the original
+established SSH session open until the VPN address returns.
+
 ## SSH after `LOCKDOWN`
 
 `LOCKDOWN` blocks new SSH connections through the public interface, including
