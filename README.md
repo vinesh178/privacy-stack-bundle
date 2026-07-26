@@ -8,7 +8,6 @@ has been verified.
 
 | Service | Purpose | Tailscale port |
 |---|---|---:|
-| Immich | Photos | 2283 |
 | Paperless-ngx | Documents and OCR | 8000 |
 | Jellyfin | Media | 8096 |
 | AdGuard Home | Ad-blocking DNS | 53, 3000 |
@@ -25,7 +24,7 @@ Docker networks and are not published as product endpoints.
 
 - Fresh Ubuntu, Debian, or Amazon Linux server with systemd
 - At least 8 GB RAM
-- At least 40 GB free disk space; 60 GB is recommended
+- At least 20 GB free disk space; a 40 GB disk is recommended
 - A free Tailscale account
 - Temporary SSH access from your IP during setup
 
@@ -152,7 +151,6 @@ current setup path. Work on that MVP resumes after the fixed
 ## Network model
 
 - `proxy` (`privacy-stack`) connects user-facing services.
-- `immich` contains Immich and its dependencies.
 - `paperless` contains Paperless-ngx and its dependencies.
 - Tailscale uses the host network.
 - `scripts/lockdown-vpn.sh` allows Tailscale ingress, removes public SSH, and
