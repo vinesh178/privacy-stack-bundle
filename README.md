@@ -47,11 +47,15 @@ The installer:
 8. Asks you to verify VPN-based SSH from a second terminal.
 9. Blocks public SSH and Docker ingress and persists the lockdown with systemd.
 
-The public bootstrap performs the same setup:
+The public bootstrap performs the same setup (downloads first, then runs):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vinesh178/privacy-stack-bundle/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/vinesh178/privacy-stack-bundle/main/install.sh -o /tmp/privacy-stack-install.sh && bash /tmp/privacy-stack-install.sh
 ```
+
+The script self-elevates to root — no need to prepend `sudo`. It works whether
+you are already root (fresh VPS), have `sudo` available (Ubuntu default user),
+or only have `su`.
 
 Run the installer from an interactive SSH terminal. Tailscale authentication
 and the final `LOCKDOWN` confirmation use that terminal deliberately to prevent

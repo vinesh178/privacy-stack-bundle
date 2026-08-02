@@ -1,7 +1,9 @@
 #!/bin/bash
 # ============================================================
 # Privacy Stack — One-Line Installer
-# Usage: curl -fsSL <url>/install.sh | sudo bash
+#
+# Recommended usage (download first, then run):
+#   curl -fsSL https://raw.githubusercontent.com/vinesh178/privacy-stack-bundle/main/install.sh -o /tmp/privacy-stack-install.sh && bash /tmp/privacy-stack-install.sh
 #
 # Environment variables (optional):
 #   INSTALL_DIR  — where to install (default: /opt/privacy-stack)
@@ -18,10 +20,18 @@ INSTALL_DIR="${INSTALL_DIR:-/opt/privacy-stack}"
 BRANCH="${BRANCH:-main}"
 REPO_URL="${REPO_URL:-https://github.com/vinesh178/privacy-stack-bundle.git}"
 
-# Must be root
+# Self-elevate to root if needed.
+# Works on fresh VPS (already root), Ubuntu-style (sudo available),
+# and minimal images (fall back to su instructions).
 if [ "$EUID" -ne 0 ]; then
-  echo -e "${RED}Please run with sudo: curl -sL <url>/install.sh | sudo bash${NC}"
-  exit 1
+  if command -v sudo >/dev/null 2>&1; then
+    echo "Elevating to root with sudo..."
+    exec sudo bash "$0" "$@"
+  else
+    echo -e "${RED}This installer must run as root.${NC}"
+    echo "Try: su -c 'bash $0'"
+    exit 1
+  fi
 fi
 
 echo ""
