@@ -22,14 +22,17 @@ REPO_URL="${REPO_URL:-https://github.com/vinesh178/privacy-stack-bundle.git}"
 
 # Self-elevate to root if needed.
 # Works on fresh VPS (already root), Ubuntu-style (sudo available),
-# and minimal images (fall back to su instructions).
+# and minimal images (falls back to su).
 if [ "$EUID" -ne 0 ]; then
+  SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || echo "$0")"
   if command -v sudo >/dev/null 2>&1; then
     echo "Elevating to root with sudo..."
-    exec sudo bash "$0" "$@"
+    exec sudo bash "$SCRIPT_PATH" "$@"
+  elif command -v su >/dev/null 2>&1; then
+    echo "Elevating to root with su..."
+    exec su -c "bash '$SCRIPT_PATH' $*"
   else
     echo -e "${RED}This installer must run as root.${NC}"
-    echo "Try: su -c 'bash $0'"
     exit 1
   fi
 fi

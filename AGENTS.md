@@ -10,7 +10,7 @@ Docker Compose-based self-hosting bundle that deploys one fixed privacy-focused 
 
 ```bash
 # One-line remote install (downloads repo + runs fixed setup)
-curl -sL <url>/install.sh | sudo bash
+curl -fsSL <url>/install.sh -o /tmp/privacy-stack-install.sh && bash /tmp/privacy-stack-install.sh
 
 # Opinionated fresh-server setup (fixed service list)
 sudo bash setup-server.sh
@@ -46,7 +46,7 @@ docker compose logs -f <service>   # e.g., paperless, jellyfin
 ## Architecture
 
 - **docker-compose.yml** — Single compose file. Services use Docker Compose profiles for selective deployment. NPM (Nginx Proxy Manager) has no profile and always starts.
-- **install.sh** — Thin bootstrap for curl-pipe-bash install. Clones repo, hands off to setup-server.sh.
+- **install.sh** — Thin bootstrap downloaded and run (not piped to bash). Self-elevates to root via sudo/su, clones repo, hands off to setup-server.sh.
 - **setup-server.sh** — Canonical opinionated fresh-server entrypoint. Enforces Ubuntu/RAM/disk requirements and installs the fixed MVP service list.
 - **cmd/runctl/** and **internal/** — Experimental catalog/plan/install/status MVP retained for the next phase; do not route the opinionated setup through it yet.
 - **registry/** — Experimental application manifest used by `runctl`.
